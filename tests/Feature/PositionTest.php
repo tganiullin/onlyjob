@@ -31,7 +31,7 @@ class PositionTest extends TestCase
         $this->assertCount(2, $position->fresh()->questions);
     }
 
-    public function test_question_is_deleted_when_position_is_deleted(): void
+    public function test_position_is_archived_instead_of_hard_deleted(): void
     {
         $position = Position::factory()->create();
 
@@ -42,8 +42,13 @@ class PositionTest extends TestCase
 
         $position->delete();
 
-        $this->assertDatabaseMissing('questions', [
+        $this->assertSoftDeleted('positions', [
+            'id' => $position->id,
+        ]);
+
+        $this->assertDatabaseHas('questions', [
             'id' => $question->id,
+            'position_id' => $position->id,
         ]);
     }
 

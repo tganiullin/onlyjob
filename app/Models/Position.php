@@ -7,11 +7,12 @@ use App\Enums\PositionLevel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Position extends Model
 {
     /** @use HasFactory<\Database\Factories\PositionFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * @var list<string>
@@ -38,5 +39,10 @@ class Position extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(Question::class);
+    }
+
+    public function interviews(): HasMany
+    {
+        return $this->hasMany(Interview::class);
     }
 }
