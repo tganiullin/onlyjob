@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Positions\Pages;
 
 use App\Filament\Resources\Positions\PositionResource;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Schema;
 
@@ -24,7 +25,9 @@ class EditPosition extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->label('Archive'),
+            RestoreAction::make(),
         ];
     }
 }
