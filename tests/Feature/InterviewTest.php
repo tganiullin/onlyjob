@@ -140,10 +140,13 @@ class InterviewTest extends TestCase
 
     public function test_interview_status_is_cast_to_enum(): void
     {
-        $interview = Interview::factory()->create([
+        $pendingInterview = Interview::factory()->create([
             'status' => InterviewStatus::Pending->value,
         ]);
 
-        $this->assertSame(InterviewStatus::Pending, $interview->fresh()->status);
+        $completedInterview = Interview::factory()->completed()->create();
+
+        $this->assertSame(InterviewStatus::Pending, $pendingInterview->fresh()->status);
+        $this->assertSame(InterviewStatus::Completed, $completedInterview->fresh()->status);
     }
 }
