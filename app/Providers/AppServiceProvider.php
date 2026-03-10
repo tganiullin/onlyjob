@@ -6,6 +6,9 @@ use App\AI\Features\InterviewReview\AiInterviewReviewer;
 use App\AI\Features\InterviewReview\Contracts\InterviewReviewer;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\AI\Features\SpeechToText\OpenAiSpeechTranscriber;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +27,43 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        RateLimiter::for('public-position-start', function (Request $request): Limit {
+            return Limit::perMinute(5)->by(sprintf(
+                'public-position-start:%s:%s',
+                (string) $request->ip(),
+                $this->resolveRouteSegmentKey($request, 'token'),
+            ));
+        });
+
+        RateLimiter::for('public-interview-transcribe', function (Request $request): Limit {
+            return Limit::perMinute(10)->by(sprintf(
+                'public-interview-transcribe:%s:%s',
+                (string) $request->ip(),
+                $this->resolveRouteSegmentKey($request, 'interview'),
+            ));
+        });
+
+        RateLimiter::for('public-interview-answer', function (Request $request): Limit {
+            return Limit::perMinute(30)->by(sprintf(
+                'public-interview-answer:%s:%s',
+                (string) $request->ip(),
+                $this->resolveRouteSegmentKey($request, 'interview'),
+            ));
+        });
+    }
+
+    private function resolveRouteSegmentKey(Request $request, string $segment): string
+    {
+        $segmentValue = $request->route($segment);
+
+        if (is_object($segmentValue) && method_exists($segmentValue, 'getKey')) {
+            return (string) $segmentValue->getKey();
+        }
+
+        if ($segmentValue === null || $segmentValue === '') {
+            return 'unknown';
+        }
+
+        return (string) $segmentValue;
     }
 }

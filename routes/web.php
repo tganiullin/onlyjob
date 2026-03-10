@@ -10,12 +10,17 @@ Route::get('/', function () {
 
 Route::prefix('public/positions')->name('public-positions.')->group(function (): void {
     Route::get('{token}', [PublicPositionInterviewController::class, 'show'])->name('show');
-    Route::post('{token}/start', [PublicPositionInterviewController::class, 'start'])->name('start');
+    Route::post('{token}/start', [PublicPositionInterviewController::class, 'start'])
+        ->middleware('throttle:public-position-start')
+        ->name('start');
 });
 
 Route::prefix('public/interviews')->name('public-interviews.')->group(function (): void {
     Route::get('{interview}', [PublicInterviewRunController::class, 'run'])->name('run');
-    Route::post('{interview}/transcribe', [PublicInterviewRunController::class, 'transcribe'])->name('transcribe');
+    Route::post('{interview}/transcribe', [PublicInterviewRunController::class, 'transcribe'])
+        ->middleware('throttle:public-interview-transcribe')
+        ->name('transcribe');
     Route::post('{interview}/questions/{interviewQuestion}', [PublicInterviewRunController::class, 'answer'])
+        ->middleware('throttle:public-interview-answer')
         ->name('questions.answer');
 });

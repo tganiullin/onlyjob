@@ -10,6 +10,7 @@ use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\Position;
 use BackedEnum;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
@@ -46,7 +47,7 @@ class PublicInterviewRunController extends Controller
             'position' => $interview->position,
             'questions' => $questions,
             'answerTimeSeconds' => (int) $answerTimeSeconds,
-            'interviewCompleted' => $interview->status === InterviewStatus::Completed,
+            'interviewCompleted' => $this->isInterviewTerminal($interview),
             'completionMessage' => self::COMPLETION_MESSAGE,
         ]);
     }
@@ -62,21 +63,40 @@ class PublicInterviewRunController extends Controller
             abort(404);
         }
 
-        if ($interview->status === InterviewStatus::Completed) {
+        if ($this->isInterviewTerminal($interview)) {
             return response()->json([
                 'completed' => true,
                 'message' => self::COMPLETION_MESSAGE,
             ]);
         }
 
-        $interviewQuestion->forceFill([
+        $expectedQuestion = $this->resolveExpectedQuestion($interview);
+
+        if (! $expectedQuestion instanceof InterviewQuestion) {
+            $this->markInterviewAsCompleted($interview);
+
+            return response()->json([
+                'completed' => true,
+                'message' => self::COMPLETION_MESSAGE,
+            ]);
+        }
+
+        if ($interviewQuestion->id !== $expectedQuestion->id) {
+            return response()->json([
+                'completed' => false,
+                'message' => 'Please answer the current question before moving to the next one.',
+                'next_question' => [
+                    'id' => $expectedQuestion->id,
+                    'text' => $expectedQuestion->question_text,
+                ],
+            ], 409);
+        }
+
+        $expectedQuestion->forceFill([
             'candidate_answer' => $request->validated('candidate_answer'),
         ])->save();
 
-        $nextQuestion = $interview->interviewQuestions()
-            ->where('sort_order', '>', $interviewQuestion->sort_order)
-            ->orderBy('sort_order')
-            ->first();
+        $nextQuestion = $this->resolveExpectedQuestion($interview);
 
         if ($nextQuestion instanceof InterviewQuestion) {
             return response()->json([
@@ -88,10 +108,7 @@ class PublicInterviewRunController extends Controller
             ]);
         }
 
-        $interview->forceFill([
-            'status' => InterviewStatus::Completed,
-            'completed_at' => now(),
-        ])->save();
+        $this->markInterviewAsCompleted($interview);
 
         return response()->json([
             'completed' => true,
@@ -106,7 +123,7 @@ class PublicInterviewRunController extends Controller
     ): JsonResponse {
         $this->abortIfInterviewNotAccessible($interview);
 
-        if ($interview->status === InterviewStatus::Completed) {
+        if ($this->isInterviewTerminal($interview)) {
             return response()->json([
                 'text' => '',
             ]);
@@ -136,5 +153,43 @@ class PublicInterviewRunController extends Controller
         if (! $interview->position instanceof Position) {
             abort(404);
         }
+    }
+
+    private function resolveExpectedQuestion(Interview $interview): ?InterviewQuestion
+    {
+        return $interview->interviewQuestions()
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull('candidate_answer')
+                    ->orWhere('candidate_answer', '');
+            })
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function isInterviewTerminal(Interview $interview): bool
+    {
+        return in_array($interview->status, [
+            InterviewStatus::Completed,
+            InterviewStatus::Passed,
+            InterviewStatus::Failed,
+        ], true);
+    }
+
+    private function markInterviewAsCompleted(Interview $interview): void
+    {
+        if ($interview->status === InterviewStatus::Completed && $interview->completed_at !== null) {
+            return;
+        }
+
+        if ($interview->status !== InterviewStatus::Pending && $interview->status !== InterviewStatus::Completed) {
+            return;
+        }
+
+        $interview->forceFill([
+            'status' => InterviewStatus::Completed,
+            'completed_at' => $interview->completed_at ?? now(),
+        ])->save();
     }
 }
