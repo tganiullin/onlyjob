@@ -100,4 +100,21 @@ class Interview extends Model
             'score' => $averageScore === null ? null : round((float) $averageScore, 2),
         ])->saveQuietly();
     }
+
+    /**
+     * @param  array{first_name: string, last_name: string, email: string, phone?: string|null}  $candidateData
+     */
+    public static function createPendingForCandidate(Position $position, array $candidateData): self
+    {
+        return static::query()->create([
+            'position_id' => $position->id,
+            'first_name' => $candidateData['first_name'],
+            'last_name' => $candidateData['last_name'],
+            'email' => $candidateData['email'],
+            'phone' => $candidateData['phone'] ?? null,
+            'status' => InterviewStatus::Pending,
+            'started_at' => now(),
+            'completed_at' => null,
+        ]);
+    }
 }
