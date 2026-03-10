@@ -45,6 +45,7 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
                 }
 
                 try {
+                    //TODO: подумать насчет того чтобы сделать асинхронный метод через воркеры
                     $response = $this->client->audio()->transcribe([
                         ...$baseParameters,
                         'file' => $audioResource,
@@ -82,14 +83,6 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
     private function sanitizeTranscript(string $transcript): string
     {
         if ($transcript === '') {
-            return '';
-        }
-
-        $normalizedTranscript = strtolower((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', $transcript));
-        $normalizedTranscript = trim((string) preg_replace('/\s+/u', ' ', $normalizedTranscript));
-        $promptLeakFingerprint = 'query builder sql eloquent laravel api mvc orm http json';
-
-        if ($normalizedTranscript === $promptLeakFingerprint) {
             return '';
         }
 
