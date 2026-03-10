@@ -1,59 +1,208 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# OnlyJob AI Interviewer (MVP)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Сервис для проведения и проверки интервью с помощью AI.
 
-## About Laravel
+Текущий MVP покрывает:
+- управление позициями и вопросами в админке;
+- фиксацию (snapshot) вопросов в момент старта интервью;
+- ручной запуск AI-проверки завершенного интервью;
+- автоматический расчет итоговой оценки и статуса passed/failed.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Технологии
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- PHP 8.x
+- Laravel 12
+- Filament 5 (админка)
+- MySQL
+- Laravel Sail
+- openai-php/laravel
+- PHPUnit
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Основные сущности
 
-## Learning Laravel
+### `positions`
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- `title`
+- `minimum_score` (порог прохождения 1..10)
+- `answer_time_seconds` (enum значений времени)
+- `level` (`junior`, `middle`, `senior`, `lead`)
+- soft delete (архивация вместо удаления)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### `questions`
 
-## Laravel Sponsors
+- принадлежат `position` (`position_id`)
+- `text`
+- `evaluation_instructions` (инструкции для оценки конкретного вопроса)
+- `sort_order` (drag-and-drop в админке)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Важно: уникальность `(position_id, sort_order)` убрана для корректного переставления вопросов.
 
-### Premium Partners
+### `interviews`
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- `position_id` (nullable, `withTrashed` в модели)
+- данные кандидата: `first_name`, `last_name`, `email`, `phone`
+- `status`: `pending`, `completed`, `passed`, `failed`
+- `score` (среднее по ответам 1..10, decimal)
+- `candidate_feedback_rating` (1..5)
+- `summary`
+- `started_at`, `completed_at`
 
-## Contributing
+### `interview_questions`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Snapshot вопросов на момент создания интервью:
+- ссылка на оригинальный `question_id` (nullable)
+- `question_text`
+- `evaluation_instructions_snapshot`
+- `candidate_answer`
+- `ai_comment`
+- `answer_score` (1..10)
+- `sort_order`
 
-## Code of Conduct
+## Бизнес-логика интервью
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+1. При создании `Interview` автоматически создаются `interview_questions` из текущих вопросов позиции.
+2. Snapshot независим от последующих изменений в `questions`.
+3. `interviews.score` автоматически пересчитывается как среднее `interview_questions.answer_score`.
+4. AI-проверка запускается только для интервью со статусом `completed`.
+5. После AI-проверки:
+   - сохраняются `ai_comment` и `answer_score` по каждому вопросу;
+   - сохраняется `summary`;
+   - пересчитывается `score`;
+   - `status` меняется на `passed` или `failed` по `position.minimum_score`.
 
-## Security Vulnerabilities
+## AI-архитектура
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Слой находится в `app/AI` и разбит на уровни:
 
-## License
+- `Contracts/AiProvider` — общий интерфейс провайдера.
+- `Providers/OpenAiProvider` — адаптер OpenAI.
+- `AiProviderResolver` — выбор провайдера по feature из `config/ai.php`.
+- `Data/AiRequest`, `Data/AiStructuredResponse` — DTO запроса/ответа.
+- `Features/InterviewReview/*` — feature-логика AI-оценки интервью.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Провайдер OpenAI
+
+`OpenAiProvider` использует **Responses API** (`v1/responses`), а не `chat/completions`.
+
+Это важно для моделей, которые не поддерживают chat endpoint (например семейство codex-моделей).
+
+### Prompt и формат ответа
+
+`AiInterviewReviewer` формирует:
+- `system prompt` с правилами оценки;
+- `user prompt` с payload интервью;
+- строгую `json_schema` для структурированного ответа.
+
+Язык ответа задается через конфиг:
+- `AI_INTERVIEW_REVIEW_OUTPUT_LANGUAGE=ru` (по умолчанию)
+
+В AI передаются:
+- данные позиции (`id`, `title`, `level`, `minimum_score`);
+- данные кандидата (`first_name`, `last_name`, `email`);
+- данные интервью (`id`, `status`, `started_at`, `completed_at`);
+- по каждому вопросу:
+  - `interview_question_id`
+  - `sort_order`
+  - `question`
+  - `evaluation_instructions` (snapshot)
+  - `candidate_answer`
+
+## Очередь и job
+
+`CheckInterviewJob`:
+- `ShouldQueue`
+- `ShouldBeUnique` (уникальность по `interviewId`, `uniqueFor=600`)
+- выполняет проверку только если:
+  - интервью существует;
+  - статус `completed`;
+  - есть вопросы в snapshot.
+
+Запуск job из админки:
+- в таблице интервью есть row action `Queue AI review` (видна только для `completed`).
+
+## Админка (Filament)
+
+- Панель: `/admin`
+- Ресурсы:
+  - `Positions` (архивация/восстановление, управление вопросами)
+  - `Interviews` (редактирование, запуск AI-review)
+
+## Конфигурация
+
+### Обязательные переменные `.env`
+
+- `OPENAI_API_KEY`
+- `AI_PROVIDER=openai`
+- `AI_OPENAI_MODEL=<model_name>`
+
+### Опциональные переменные `.env`
+
+- `AI_INTERVIEW_REVIEW_PROVIDER` (по умолчанию наследует `AI_PROVIDER`)
+- `AI_INTERVIEW_REVIEW_MODEL` (по умолчанию наследует `AI_OPENAI_MODEL`)
+- `AI_INTERVIEW_REVIEW_TEMPERATURE` (default `0.1`)
+- `AI_INTERVIEW_REVIEW_MAX_TOKENS` (default `2500`)
+- `AI_INTERVIEW_REVIEW_OUTPUT_LANGUAGE` (default `ru`)
+- `AI_OPENAI_TEMPERATURE` (default `0.1`)
+
+После изменения env/конфига:
+- `./vendor/bin/sail artisan config:clear`
+- если запущен долгоживущий worker, перезапустить его.
+
+## Локальный запуск (Sail)
+
+```bash
+./vendor/bin/sail up -d
+./vendor/bin/sail composer install
+./vendor/bin/sail npm install
+./vendor/bin/sail artisan key:generate
+./vendor/bin/sail artisan migrate
+./vendor/bin/sail npm run dev
+```
+
+Запустить очередь отдельно:
+
+```bash
+./vendor/bin/sail artisan queue:work
+```
+
+Или использовать dev-скрипт проекта:
+
+```bash
+./vendor/bin/sail composer run dev
+```
+
+## Тесты
+
+Запуск всех тестов:
+
+```bash
+./vendor/bin/sail artisan test --compact
+```
+
+Ключевые feature-тесты MVP:
+- `tests/Feature/PositionTest.php`
+- `tests/Feature/InterviewTest.php`
+- `tests/Feature/CheckInterviewJobTest.php`
+
+Для AI используются fake-провайдеры в тестах (`tests/Fakes/FakeAiProvider.php`), чтобы тесты не зависели от реального OpenAI API.
+
+## Частые проблемы
+
+### Модель не поддерживает chat/completions
+
+Ошибка вида:
+`This is not a chat model and thus not supported in the v1/chat/completions endpoint`
+
+Решение: уже учтено в проекте — используется `responses` endpoint.
+
+### Изменил `.env`, но модель/параметры не применились
+
+1. `./vendor/bin/sail artisan config:clear`
+2. Перезапусти queue worker.
+
+### Фронтенд-изменения не видны
+
+Запусти:
+- `./vendor/bin/sail npm run dev`
+или
+- `./vendor/bin/sail npm run build`

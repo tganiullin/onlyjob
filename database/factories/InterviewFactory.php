@@ -32,4 +32,12 @@ class InterviewFactory extends Factory
             'completed_at' => null,
         ];
     }
+
+    public function completed(): static
+    {
+        return $this->state(fn (): array => [
+            'status' => InterviewStatus::Completed->value,
+            'completed_at' => now(),
+        ]);
+    }
 }
