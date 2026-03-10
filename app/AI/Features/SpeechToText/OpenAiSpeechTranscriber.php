@@ -20,8 +20,11 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
         $temporaryAudioPath = $this->createTemporaryAudioFile($audioFile);
 
         try {
+            $sttModel = $this->resolveSttModel();
+
             $baseParameters = [
-                'temperature' => (float) config('ai.openai.stt_temperature', 0),
+                'temperature' => (float) config('ai.features.speech_to_text.temperature', 0),
+                'prompt' => $this->speechToTextPrompt(),
             ];
             $normalizedLanguage = $this->normalizeLanguage($language);
 
@@ -29,48 +32,26 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
                 $baseParameters['language'] = $normalizedLanguage;
             }
 
-            $sttPrompt = trim((string) config('ai.openai.stt_prompt', ''));
+            $audioResource = fopen($temporaryAudioPath, 'rb');
 
-            if ($sttPrompt !== '') {
-                $baseParameters['prompt'] = $sttPrompt;
+            if ($audioResource === false) {
+                throw new RuntimeException('Unable to read uploaded audio file.');
             }
 
-            $lastException = null;
-
-            foreach ($this->resolveSttModels() as $sttModel) {
-                $audioResource = fopen($temporaryAudioPath, 'rb');
-
-                if ($audioResource === false) {
-                    throw new RuntimeException('Unable to read uploaded audio file.');
-                }
-
-                try {
-                    //TODO: подумать насчет того чтобы сделать асинхронный метод через воркеры
-                    $response = $this->client->audio()->transcribe([
-                        ...$baseParameters,
-                        'file' => $audioResource,
-                        'model' => $sttModel,
-                    ]);
-
-                    $transcript = $this->sanitizeTranscript(trim((string) $response->text));
-
-                    if ($transcript !== '') {
-                        return $transcript;
-                    }
-                } catch (Throwable $exception) {
-                    $lastException = $exception;
-                } finally {
-                    if (is_resource($audioResource)) {
-                        fclose($audioResource);
-                    }
+            try {
+                // TODO: подумать насчет того чтобы сделать асинхронный метод через воркеры
+                $response = $this->client->audio()->transcribe([
+                    ...$baseParameters,
+                    'file' => $audioResource,
+                    'model' => $sttModel,
+                ]);
+            } finally {
+                if (is_resource($audioResource)) {
+                    fclose($audioResource);
                 }
             }
 
-            if ($lastException !== null) {
-                throw $lastException;
-            }
-
-            return '';
+            return $this->sanitizeTranscript(trim((string) $response->text));
         } catch (Throwable $exception) {
             throw AiProviderException::requestFailed('openai-stt', $exception);
         } finally {
@@ -136,19 +117,22 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
         };
     }
 
-    /**
-     * @return list<string>
-     */
-    private function resolveSttModels(): array
+    private function resolveSttModel(): string
     {
-        $primaryModel = trim((string) config('ai.openai.stt_model'));
-        $fallbackModel = trim((string) config('ai.openai.stt_fallback_model'));
-        $models = array_values(array_filter(array_unique([$primaryModel, $fallbackModel])));
+        $model = trim((string) config('ai.features.speech_to_text.model'));
 
-        if ($models === []) {
-            throw new RuntimeException('No STT model configured.');
+        if ($model === '') {
+            throw new RuntimeException('No speech-to-text model configured.');
         }
 
-        return $models;
+        return $model;
+    }
+
+    private function speechToTextPrompt(): string
+    {
+        return 'The speaker may switch between Russian and English in one sentence. '
+            .'Transcribe exactly what is said and never invent words that are not present in the audio. '
+            .'If the audio has no intelligible speech, return an empty string. '
+            .'Preserve technical terms and acronyms without translating them (for example: Query Builder, SQL, Eloquent, Laravel, API, MVC, ORM, HTTP, JSON).';
     }
 }
