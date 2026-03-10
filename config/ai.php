@@ -12,16 +12,6 @@ return [
     'openai' => [
         'model' => env('AI_OPENAI_MODEL', 'gpt-4o-mini'),
         'temperature' => (float) env('AI_OPENAI_TEMPERATURE', 0.1),
-        'stt_model' => env('AI_OPENAI_STT_MODEL', 'gpt-4o-mini-transcribe'),
-        'stt_fallback_model' => env('AI_OPENAI_STT_FALLBACK_MODEL', 'whisper-1'),
-        'stt_temperature' => (float) env('AI_OPENAI_STT_TEMPERATURE', 0),
-        'stt_prompt' => env(
-            'AI_OPENAI_STT_PROMPT',
-            'The speaker may switch between Russian and English in one sentence. '
-            .'Transcribe exactly what is said and never invent words that are not present in the audio. '
-            .'If the audio has no intelligible speech, return an empty string. '
-            .'Preserve technical terms and acronyms without translating them (for example: Query Builder, SQL, Eloquent, Laravel, API, MVC, ORM, HTTP, JSON).',
-        ),
     ],
 
     'features' => [
@@ -32,14 +22,17 @@ return [
             'max_tokens' => (int) env('AI_INTERVIEW_REVIEW_MAX_TOKENS', 2500),
             'output_language' => env('AI_INTERVIEW_REVIEW_OUTPUT_LANGUAGE', 'ru'),
         ],
-        'position_filling' => [
-            'provider' => env('AI_POSITION_FILLING_PROVIDER', env('AI_PROVIDER', 'openai')),
-        ],
         'question_generation' => [
             'provider' => env('AI_QUESTION_GENERATION_PROVIDER', env('AI_PROVIDER', 'openai')),
+            'model' => env('AI_QUESTION_GENERATION_MODEL', env('AI_OPENAI_MODEL', 'gpt-4o-mini')),
+            'temperature' => (float) env('AI_QUESTION_GENERATION_TEMPERATURE', 0.2),
+            'max_tokens' => (int) env('AI_QUESTION_GENERATION_MAX_TOKENS', 2000),
+            'output_language' => env('AI_QUESTION_GENERATION_OUTPUT_LANGUAGE', 'ru'),
         ],
-        'audio_interview' => [
-            'provider' => env('AI_AUDIO_INTERVIEW_PROVIDER', env('AI_PROVIDER', 'openai')),
+        'speech_to_text' => [
+            'provider' => env('AI_SPEECH_TO_TEXT_PROVIDER', env('AI_PROVIDER', 'openai')),
+            'model' => env('AI_SPEECH_TO_TEXT_MODEL', env('AI_OPENAI_STT_MODEL', 'gpt-4o-mini-transcribe')),
+            'temperature' => (float) env('AI_SPEECH_TO_TEXT_TEMPERATURE', env('AI_OPENAI_STT_TEMPERATURE', 0)),
         ],
     ],
 ];
