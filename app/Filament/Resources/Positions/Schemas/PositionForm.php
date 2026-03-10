@@ -4,9 +4,11 @@ namespace App\Filament\Resources\Positions\Schemas;
 
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use App\Models\Position;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -48,6 +50,21 @@ class PositionForm
                             ->inline()
                             ->default(PositionLevel::Middle->value)
                             ->required(),
+                    ]),
+                Section::make('Public access')
+                    ->columnSpanFull()
+                    ->schema([
+                        Toggle::make('is_public')
+                            ->label('Public link')
+                            ->helperText('Enable to allow candidates to start interview from a public URL.'),
+                        TextInput::make('public_link')
+                            ->label('Public link URL')
+                            ->readOnly()
+                            ->dehydrated(false)
+                            ->copyable(copyMessage: 'Public link copied', copyMessageDuration: 1500)
+                            ->helperText('The link appears after the position is saved as public.')
+                            ->formatStateUsing(static fn (?Position $record): ?string => $record?->public_url)
+                            ->visible(static fn (?Position $record): bool => $record instanceof Position && filled($record->public_url)),
                     ]),
                 Repeater::make('questions')
                     ->relationship()
