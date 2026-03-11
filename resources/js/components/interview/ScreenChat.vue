@@ -1,95 +1,396 @@
 <script setup>
-defineProps({
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
+
+const props = defineProps({
+    firstName: { type: String, default: '' },
     answerTimeLabel: { type: String, default: '2 минуты' },
+    hasMicrophoneAccess: { type: Boolean, default: false },
+    showInstructionsMessage: { type: Boolean, default: false },
+    interviewStarted: { type: Boolean, default: false },
+    questions: { type: Array, default: () => [] },
+    currentQuestionIndex: { type: Number, default: 0 },
+    interviewCompleted: { type: Boolean, default: false },
+    submittedAnswers: { type: Object, default: () => ({}) },
+    remainingSeconds: { type: Number, default: 0 },
+    formatTimer: { type: Function, default: () => '' },
+    completionMessage: { type: String, default: '' },
     transcribing: { type: Boolean, default: false },
     phraseCompleted: { type: Boolean, default: false },
     phraseResult: { type: String, default: '' },
     microphoneStatus: { type: String, default: '' },
     microphoneStatusError: { type: Boolean, default: false },
     isRecordingPhrase: { type: Boolean, default: false },
+    submitting: { type: Boolean, default: false },
+    skipSubmitting: { type: Boolean, default: false },
+    isRecordingAnswer: { type: Boolean, default: false },
+    answerStatus: { type: String, default: '' },
+    answerStatusError: { type: Boolean, default: false },
+    recordingSupported: { type: Boolean, default: true },
 });
-defineEmits(['request-microphone', 'toggle-phrase-record', 'continue']);
+const emit = defineEmits(['request-microphone', 'toggle-phrase-record', 'continue', 'start', 'record-toggle', 'skip-answer']);
+
+function formatMessageTime() {
+    const d = new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()]
+        .map((n) => String(n).padStart(2, '0'))
+        .join(':');
+}
+
+const welcomeTexts = computed(() => [
+    'Привет 👋',
+    'Я - {Имя}, твой виртуальный интервьюер.',
+    `Я запрограммирован оценить твои знания с помощью ряда фундаментальных вопросов. Для ответа на каждый вопрос у тебя будет ${props.answerTimeLabel}.`,
+    'Чтобы записать ответ, нужно использовать микрофон. Давай проверим, что он включен и работает.',
+]);
+
+/** Сообщения бота по порядку: welcome — текст приветствия, sentence — блок «Прочтите предложение». time — чч:мм:сс по локальному времени пользователя. */
+const botBlocks = ref([]);
+let timeouts = [];
+
+const userInitial = computed(() => {
+    const name = (props.firstName || '').trim();
+    return name ? name[0].toUpperCase() : 'Вы'[0];
+});
+
+const phraseResultTime = ref('');
+const phraseReplyTime = ref('');
+
+watch(() => props.phraseResult, (v) => {
+    if (v) phraseResultTime.value = formatMessageTime();
+}, { immediate: true });
+
+watch([() => props.phraseCompleted, () => props.phraseResult], ([completed, result]) => {
+    if (completed && result) phraseReplyTime.value = formatMessageTime();
+}, { immediate: true });
+
+const completionMessageTime = ref('');
+watch(() => props.interviewCompleted, (completed) => {
+    if (completed) completionMessageTime.value = formatMessageTime();
+}, { immediate: true });
+
+const continueLoading = ref(false);
+function handleContinueClick() {
+    continueLoading.value = true;
+    emit('continue');
+    setTimeout(() => {
+        continueLoading.value = false;
+    }, 400);
+}
+
+const visibleQuestions = () => {
+    if (!props.interviewStarted || !Array.isArray(props.questions)) return [];
+    if (props.interviewCompleted) return props.questions;
+    const idx = Math.max(props.currentQuestionIndex, 0);
+    return props.questions.slice(0, Math.min(idx + 1, props.questions.length));
+};
+
+function scrollToCurrent() {
+    nextTick(() => {
+        const el = document.getElementById('current-question-card') || document.getElementById('interview-completed-card');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+}
+
+watch(
+    () => [props.interviewStarted, props.currentQuestionIndex, props.interviewCompleted],
+    scrollToCurrent,
+    { immediate: true },
+);
+
+onMounted(() => {
+    const add = (item) => botBlocks.value = [...botBlocks.value, { ...item, time: formatMessageTime() }];
+    add({ type: 'welcome', text: welcomeTexts.value[0] });
+    timeouts.push(setTimeout(() => add({ type: 'welcome', text: welcomeTexts.value[1] }), 1000));
+    timeouts.push(setTimeout(() => add({ type: 'welcome', text: welcomeTexts.value[2] }), 1000 + 1000));
+    timeouts.push(setTimeout(() => add({ type: 'welcome', text: welcomeTexts.value[3] }), 1000 + 1000 + 1500));
+    timeouts.push(setTimeout(() => add({ type: 'sentence' }), 1000 + 1000 + 1500 + 1000));
+});
+
+onUnmounted(() => {
+    timeouts.forEach(clearTimeout);
+});
 </script>
 
 <template>
-    <section class="min-h-[78vh]">
+    <section class="min-h-[78vh] font-sans" :class="{ 'pb-44': interviewStarted && !interviewCompleted }">
         <div class="mx-auto max-w-[760px] space-y-5 pb-40">
-            <div class="max-w-[480px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-sm text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
-                Привет 👋
-            </div>
-            <div class="max-w-[520px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-sm text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
-                Я — Laravel, твой виртуальный интервьюер.
-            </div>
-            <div class="max-w-[620px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-sm text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
-                Я запрограммирована оценить твои знания с помощью ряда фундаментальных вопросов.
-                Для ответа на каждый вопрос у тебя будет {{ answerTimeLabel }}.
-            </div>
-            <div class="max-w-[620px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-sm text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
-                Чтобы записать ответ, нужно использовать микрофон. Давай проверим, что он включен и работает.
-            </div>
-
-            <div class="rounded-2xl bg-white px-6 py-5 shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a43c9]">Прочитай предложение:</p>
-                <p class="mt-2 text-lg text-[#232742]">«Хотите понять других - пристальнее смотрите в самого себя.»</p>
-                <p
-                    class="mt-3 text-sm"
-                    :class="microphoneStatusError ? 'text-red-600' : 'text-[#4f556f]'"
-                >
-                    {{ microphoneStatus || 'Разрешите доступ к микрофону и проверьте запись.' }}
-                </p>
-
-                <div class="mt-4 flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        class="inline-flex h-11 items-center justify-center rounded-full border border-[#cfd5f5] bg-white px-6 text-sm font-medium text-[#414766] transition hover:bg-[#f6f7ff]"
-                        @click="$emit('request-microphone')"
-                    >
-                        Разрешить микрофон
-                    </button>
-                    <button
-                        type="button"
-                        :disabled="transcribing || isRecordingPhrase"
-                        :class="[
-                            'inline-flex h-11 items-center justify-center rounded-full px-7 text-sm font-semibold text-white transition',
-                            isRecordingPhrase
-                                ? 'bg-[#eb1f3a] shadow-[0_6px_0_rgba(160,28,45,0.45)] hover:bg-[#d61731]'
-                                : 'bg-[#1b045f] shadow-[0_6px_0_rgba(112,102,189,0.55)] hover:bg-[#250875]',
-                        ]"
-                        @click="$emit('toggle-phrase-record')"
-                    >
-                        {{ isRecordingPhrase ? 'Остановить запись' : 'Записать фразу' }}
-                    </button>
-                </div>
-            </div>
-
-            <div v-show="phraseResult !== ''" class="flex justify-end">
-                <div class="max-w-[540px] rounded-2xl rounded-tr-md bg-[#6d76e8] px-5 py-4 text-sm text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
-                    <p>{{ phraseResult || 'Не удалось распознать фразу.' }}</p>
-                </div>
-            </div>
-
+            <!-- Сообщения бота по таймлайну (без TransitionGroup) -->
             <div
-                v-show="phraseCompleted && phraseResult !== ''"
-                class="max-w-[620px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-sm text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
+                v-for="(block, index) in botBlocks"
+                :key="index"
+                class="flex items-start gap-3"
             >
-                Все в порядке! Я слышу тебя хорошо. 🤗
+                <div
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                    style="background-color: var(--color-brand);"
+                    aria-hidden="true"
+                >
+                    L
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-1">
+                    <div class="flex items-start gap-2">
+                        <div
+                            v-if="block.type === 'welcome'"
+                            class="chat-bubble min-w-0 max-w-[520px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-base text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
+                        >
+                            {{ block.text }}
+                        </div>
+                        <div
+                            v-else-if="block.type === 'sentence'"
+                            class="chat-bubble min-w-0 rounded-2xl border border-[#E6E6EF] bg-white px-6 py-5 shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
+                        >
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#636985]">Прочтите предложение:</p>
+                            <p class="mt-2 text-lg font-medium text-[#232742]">«Хотите понять других - пристальнее смотрите в самого себя.»</p>
+                            <p
+                                class="mt-3 text-base text-[#4f556f]"
+                                :class="microphoneStatusError ? 'text-red-600' : ''"
+                            >
+                                {{ microphoneStatus || 'Разрешите доступ к микрофону и проверьте запись.' }}
+                            </p>
+
+                            <div v-if="!phraseCompleted" class="mt-4 flex flex-wrap gap-3">
+                                <button
+                                    type="button"
+                                    :disabled="phraseCompleted"
+                                    class="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                                    @click="$emit('request-microphone')"
+                                >
+                                    Разрешить доступ к микрофону
+                                </button>
+                                <button
+                                    type="button"
+                                    :disabled="transcribing || phraseCompleted || (!isRecordingPhrase && !hasMicrophoneAccess)"
+                                    :class="[
+                                        'inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-7 text-sm font-semibold text-white transition-colors duration-200 ease-[ease]',
+                                        isRecordingPhrase
+                                            ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
+                                            : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
+                                    ]"
+                                    @click="$emit('toggle-phrase-record')"
+                                >
+                                    <span
+                                        v-if="transcribing"
+                                        class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                        aria-hidden="true"
+                                    ></span>
+                                    <template v-else>
+                                        {{ isRecordingPhrase ? 'Остановить запись' : 'Записать фразу' }}
+                                    </template>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <span v-if="block.time && block.type === 'welcome'" class="text-xs text-[#b4b8cc]">{{ block.time }}</span>
+                </div>
+            </div>
+
+            <Transition name="chat-message">
+                <div v-if="phraseResult !== ''" class="flex items-start justify-end gap-3">
+                    <div class="flex min-w-0 max-w-[540px] flex-col items-end gap-1">
+                        <div class="chat-bubble min-w-0 max-w-[540px] rounded-2xl rounded-tr-md bg-[var(--color-brand)] px-5 py-4 text-base text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
+                            <p>{{ phraseResult || 'Не удалось распознать фразу.' }}</p>
+                        </div>
+                        <span v-if="phraseResultTime" class="text-xs text-[#b4b8cc]">{{ phraseResultTime }}</span>
+                    </div>
+                    <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E6E6EF] text-lg font-bold text-black"
+                        aria-hidden="true"
+                    >
+                        {{ userInitial }}
+                    </div>
+                </div>
+            </Transition>
+
+            <Transition name="chat-message">
+                <div
+                    v-if="phraseCompleted && phraseResult !== ''"
+                    class="flex items-start gap-3"
+                >
+                    <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                        style="background-color: var(--color-brand);"
+                        aria-hidden="true"
+                    >
+                        L
+                    </div>
+                    <div class="flex min-w-0 flex-1 flex-col gap-1">
+                        <div class="flex items-start gap-2">
+                            <div class="chat-bubble min-w-0 max-w-[620px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-base text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                                <p>Все в порядке! Я слышу тебя хорошо. 🤗</p>
+                                <button
+                                    v-if="!showInstructionsMessage && !interviewStarted"
+                                    type="button"
+                                    :disabled="continueLoading"
+                                    class="btn-brand mt-4 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 px-6 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                    @click="handleContinueClick"
+                                >
+                                    <span
+                                        v-if="continueLoading"
+                                        class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                        aria-hidden="true"
+                                    ></span>
+                                    <template v-else>
+                                        Продолжить
+                                    </template>
+                                </button>
+                            </div>
+                        </div>
+                        <span v-if="phraseReplyTime" class="text-xs text-[#b4b8cc]">{{ phraseReplyTime }}</span>
+                    </div>
+                </div>
+            </Transition>
+
+            <Transition name="chat-message">
+                <div
+                    v-if="showInstructionsMessage"
+                    class="flex items-start gap-3"
+                >
+                    <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                        style="background-color: var(--color-brand);"
+                        aria-hidden="true"
+                    >
+                        L
+                    </div>
+                    <div class="flex min-w-0 flex-1 flex-col gap-1">
+                        <div class="chat-bubble min-w-0 max-w-[620px] rounded-2xl rounded-tl-md border border-[#E6E6EF] bg-white px-6 py-5 shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                            <h3 class="text-xl font-bold uppercase tracking-wide text-[#636985]">Как отвечать на вопросы</h3>
+                            <p class="mt-3 text-base text-[#555b77]">Время на ответ отсчитывается с момента появления вопроса на экране.</p>
+
+                            <ol class="mt-6 list-decimal space-y-2 pl-5 text-base font-semibold text-[#252a44]">
+                                <li>Ознакомьтесь с вопросом</li>
+                                <li>Нажмите «Записать ответ»</li>
+                                <li>Дайте развернутый ответ, подкрепив его примерами</li>
+                                <li>Для сохранения нажмите «Остановить запись»</li>
+                            </ol>
+
+                            <button
+                                v-if="!interviewStarted"
+                                type="button"
+                                class="btn-brand mt-6 inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-2xl px-8 text-base font-semibold text-white"
+                                @click="$emit('start')"
+                            >
+                                Поехали!
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+
+            <!-- Вопросы интервью (дописываются в чат) -->
+            <div
+                v-for="(question, index) in visibleQuestions()"
+                :key="question.id"
+                :id="interviewStarted && !interviewCompleted && index === currentQuestionIndex ? 'current-question-card' : undefined"
+                class="flex items-start gap-3"
+            >
+                <div
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                    style="background-color: var(--color-brand);"
+                    aria-hidden="true"
+                >
+                    L
+                </div>
+                <div class="min-w-0 flex-1 max-w-[620px]">
+                    <div
+                        v-if="!interviewCompleted && index === currentQuestionIndex"
+                        class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
+                    >
+                        <p class="text-base font-medium leading-relaxed">{{ question.text }}</p>
+                        <p class="mt-4 text-center text-2xl font-medium text-[#2c3150]">{{ formatTimer(remainingSeconds) }}</p>
+                    </div>
+                    <div
+                        v-else
+                        class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-4 shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
+                    >
+                        <p class="text-base font-medium leading-relaxed text-[#6a6f8a]">{{ question.text }}</p>
+                        <p class="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-[#289a5f]">
+                            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Сохранено
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Сообщение о завершении интервью -->
+            <div
+                v-if="interviewStarted && interviewCompleted"
+                id="interview-completed-card"
+                class="flex items-start gap-3"
+            >
+                <div
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                    style="background-color: var(--color-brand);"
+                    aria-hidden="true"
+                >
+                    L
+                </div>
+                <div class="min-w-0 flex-1 max-w-[620px] flex flex-col gap-1">
+                    <div class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-5 text-base text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                        <p>{{ completionMessage }}</p>
+                        <p class="mt-4">
+                            Как только ваши ответы будут проанализированы, вы сможете получить приглашение на следующий этап интервью.
+                        </p>
+                        <p class="mt-2">
+                            Эту страницу можно закрыть.
+                        </p>
+                    </div>
+                    <span v-if="completionMessageTime" class="text-xs text-[#b4b8cc]">{{ completionMessageTime }}</span>
+                </div>
             </div>
         </div>
 
-        <div class="fixed inset-x-0 bottom-8 z-20 pl-[270px]">
-            <div class="mx-auto flex max-w-[1080px] items-center justify-center gap-6 px-10">
-                <div class="h-18 w-18 rounded-full bg-white p-1 shadow-[0_14px_34px_rgba(84,95,167,0.24)]">
-                    <div class="h-full w-full rounded-full bg-gradient-to-br from-[#8f96ef] to-[#5d65d5]"></div>
+        <!-- Панель записи ответа (только в фазе интервью, до завершения) -->
+        <div
+            v-show="interviewStarted && !interviewCompleted"
+            class="fixed inset-x-0 bottom-8 z-20 py-4 backdrop-blur-[4px]"
+        >
+            <div class="mx-auto flex max-w-[1080px] flex-col items-center justify-center gap-4 px-10">
+                <div class="flex flex-wrap items-center justify-center gap-4">
+                    <button
+                        type="button"
+                        :disabled="transcribing || submitting || isRecordingAnswer || currentQuestionIndex >= questions.length"
+                        class="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="$emit('skip-answer')"
+                    >
+                        <span
+                            v-if="skipSubmitting"
+                            class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#2f334c] border-t-transparent"
+                            aria-hidden="true"
+                        ></span>
+                        <template v-else>
+                            Не знаю ответ
+                        </template>
+                    </button>
+                    <button
+                        type="button"
+                        :disabled="transcribing || submitting || interviewCompleted || currentQuestionIndex >= questions.length"
+                        :class="[
+                            'inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white transition-colors duration-200 ease-[ease]',
+                            isRecordingAnswer
+                                ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
+                                : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
+                        ]"
+                        @click="$emit('record-toggle')"
+                    >
+                        <span
+                            v-if="transcribing || (submitting && !skipSubmitting)"
+                            class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                            aria-hidden="true"
+                        ></span>
+                        <template v-else>
+                            {{ isRecordingAnswer ? 'Остановить запись' : 'Записать ответ' }}
+                        </template>
+                    </button>
                 </div>
-
-                <button
-                    v-show="phraseCompleted"
-                    type="button"
-                    class="inline-flex h-14 min-w-[300px] items-center justify-center rounded-full bg-[#1b045f] px-10 text-sm font-semibold text-white shadow-[0_6px_0_rgba(112,102,189,0.55)] transition hover:bg-[#250875]"
-                    @click="$emit('continue')"
+                <p
+                    v-show="!recordingSupported"
+                    class="text-center text-xs text-amber-700"
                 >
-                    Продолжить
-                </button>
+                    Запись звука не поддерживается в этом браузере. Пожалуйста, используйте Chrome или Safari.
+                </p>
             </div>
         </div>
     </section>

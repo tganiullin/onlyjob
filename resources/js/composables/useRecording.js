@@ -36,6 +36,13 @@ export function useRecording() {
 
     const hasValidStream = () => stream.value instanceof MediaStream;
 
+    const stopAllTracks = () => {
+        if (stream.value instanceof MediaStream) {
+            stream.value.getTracks().forEach((track) => track.stop());
+            stream.value = null;
+        }
+    };
+
     const ensureMicrophoneAccess = async () => {
         if (!recordingSupported.value) return false;
         if (hasValidStream()) return true;
@@ -102,9 +109,11 @@ export function useRecording() {
 
             if (blob.size === 0) {
                 onError?.('Пустая запись. Попробуйте еще раз.');
+                stopAllTracks();
                 return;
             }
             onStop?.(blob, stoppedMode);
+            stopAllTracks();
         };
 
         recorder.value.start();

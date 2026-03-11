@@ -16,7 +16,7 @@ use Illuminate\View\View;
 
 class PublicInterviewRunController extends Controller
 {
-    private const COMPLETION_MESSAGE = 'Спасибо! Вы завершили интервью. Ваши ответы успешно сохранены.';
+    private const COMPLETION_MESSAGE = 'Спасибо! Вы успешно завершили первый этап интервью.';
 
     public function run(Interview $interview): View
     {

@@ -59,6 +59,7 @@
         background-color: var(--color-brand);
         cursor: pointer;
         border-radius: 1rem;
+        transition: background-color 0.2s ease;
     }
     .btn-brand:hover:not(:disabled) {
         background-color: var(--color-brand-hover);
@@ -87,4 +88,41 @@
         background-color: var(--color-brand);
         border-color: var(--color-brand);
     }
+}
+
+@keyframes chat-message-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.chat-bubble {
+    font-family: var(--font-sans);
+    animation: chat-message-in 0.25s ease-out forwards;
+}
+
+.chat-message-enter-active {
+    transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+.chat-message-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+}
+.chat-message-enter-to {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.help-modal-enter-active,
+.help-modal-leave-active {
+    transition: opacity 0.2s ease;
+}
+.help-modal-enter-from,
+.help-modal-leave-to {
+    opacity: 0;
 }

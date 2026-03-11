@@ -2,8 +2,6 @@
 import { ref, computed, reactive } from 'vue';
 import ScreenStart from './components/interview/ScreenStart.vue';
 import ScreenChat from './components/interview/ScreenChat.vue';
-import ScreenInterview from './components/interview/ScreenInterview.vue';
-import InstructionsModal from './components/interview/InstructionsModal.vue';
 import { useQuestionTimer } from './composables/useQuestionTimer.js';
 import { useRecording } from './composables/useRecording.js';
 import { useInterviewApi } from './composables/useInterviewApi.js';
@@ -14,7 +12,7 @@ const props = defineProps({
     transcribeEndpoint: { type: String, default: '' },
     answerTimeSeconds: { type: Number, default: 120 },
     interviewCompleted: { type: Boolean, default: false },
-    completionMessage: { type: String, default: 'Спасибо! Вы завершили интервью. Ваши ответы успешно сохранены.' },
+    completionMessage: { type: String, default: 'Спасибо! Вы успешно завершили первый этап интервью.' },
     firstName: { type: String, default: '' },
     lastName: { type: String, default: '' },
     positionTitle: { type: String, default: '' },
@@ -41,14 +39,17 @@ questions.value.forEach((q) => {
 });
 
 const currentScreen = ref(completed.value ? 'interview' : 'start');
-const showInstructionsModal = ref(false);
+const showInstructionsInChat = ref(false);
+const showHelpModal = ref(false);
 
 const phraseCompleted = ref(false);
 const phraseResult = ref('');
 const microphoneStatus = ref('');
 const microphoneStatusError = ref(false);
+const hasMicrophoneAccess = ref(false);
 const transcribing = ref(false);
 const submitting = ref(false);
+const skipSubmitting = ref(false);
 const answerStatus = ref(completed.value ? props.completionMessage : '');
 const answerStatusError = ref(false);
 
@@ -88,6 +89,7 @@ async function handleRequestMicrophone() {
     if (ok) {
         microphoneStatus.value = 'Микрофон доступен. Можно продолжать.';
         microphoneStatusError.value = false;
+        hasMicrophoneAccess.value = true;
     } else {
         microphoneStatus.value = 'Не удалось получить доступ к микрофону.';
         microphoneStatusError.value = true;
@@ -133,11 +135,10 @@ function handleChatContinue() {
         microphoneStatusError.value = true;
         return;
     }
-    showInstructionsModal.value = true;
+    showInstructionsInChat.value = true;
 }
 
 function handleInstructionsStart() {
-    showInstructionsModal.value = false;
     currentScreen.value = 'interview';
     startTimer(
         () => {},
@@ -198,6 +199,9 @@ async function submitAnswer(candidateAnswer) {
         );
     } finally {
         submitting.value = false;
+        if (candidateAnswer === 'Не знаю ответ') {
+            skipSubmitting.value = false;
+        }
     }
 }
 
@@ -250,18 +254,21 @@ function handleRecordToggle() {
 }
 
 function handleSkipAnswer() {
+    skipSubmitting.value = true;
     submitAnswer('Не знаю ответ');
 }
 </script>
 
 <template>
-    <div class="relative min-h-screen overflow-hidden">
-        <aside class="fixed inset-y-0 left-0 w-[270px] bg-[#dce2f8] px-12 py-10">
-            <div class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">AYA</div>
-        </aside>
-
-        <main class="min-h-screen pl-[270px]">
-            <a href="#" class="absolute right-10 top-10 text-sm text-[#61678b] hover:text-[#464c72]">ⓘ Помощь</a>
+    <div class="relative min-h-screen overflow-hidden font-sans">
+        <main class="min-h-screen">
+            <button
+                type="button"
+                class="absolute right-10 top-10 text-sm text-[#61678b] hover:text-[#464c72]"
+                @click="showHelpModal = true"
+            >
+                ⓘ Помощь
+            </button>
 
             <div class="mx-auto w-full max-w-[1080px] px-10 py-12">
                 <ScreenStart
@@ -275,21 +282,11 @@ function handleSkipAnswer() {
                 />
 
                 <ScreenChat
-                    v-show="currentScreen === 'chat'"
-                    :answer-time-label="answerTimeLabel"
-                    :transcribing="transcribing"
-                    :phrase-completed="phraseCompleted"
-                    :phrase-result="phraseResult"
-                    :microphone-status="microphoneStatus"
-                    :microphone-status-error="microphoneStatusError"
-                    :is-recording-phrase="isRecordingPhrase"
-                    @request-microphone="handleRequestMicrophone"
-                    @toggle-phrase-record="handleTogglePhraseRecord"
-                    @continue="handleChatContinue"
-                />
-
-                <ScreenInterview
-                    v-show="currentScreen === 'interview'"
+                    v-if="currentScreen === 'chat' || currentScreen === 'interview'"
+                    :first-name="firstName"
+                    :has-microphone-access="hasMicrophoneAccess"
+                    :show-instructions-message="showInstructionsInChat"
+                    :interview-started="currentScreen === 'interview'"
                     :questions="questions"
                     :current-question-index="currentIndex"
                     :interview-completed="completed"
@@ -297,21 +294,61 @@ function handleSkipAnswer() {
                     :remaining-seconds="remainingSeconds"
                     :format-timer="formatTimer"
                     :completion-message="completionMessage"
+                    :answer-time-label="answerTimeLabel"
                     :transcribing="transcribing"
+                    :phrase-completed="phraseCompleted"
+                    :phrase-result="phraseResult"
+                    :microphone-status="microphoneStatus"
+                    :microphone-status-error="microphoneStatusError"
+                    :is-recording-phrase="isRecordingPhrase"
                     :submitting="submitting"
+                    :skip-submitting="skipSubmitting"
                     :is-recording-answer="isRecordingAnswer"
                     :answer-status="answerStatus"
                     :answer-status-error="answerStatusError"
                     :recording-supported="recordingSupported"
+                    @request-microphone="handleRequestMicrophone"
+                    @toggle-phrase-record="handleTogglePhraseRecord"
+                    @continue="handleChatContinue"
+                    @start="handleInstructionsStart"
                     @record-toggle="handleRecordToggle"
                     @skip-answer="handleSkipAnswer"
                 />
             </div>
         </main>
 
-        <InstructionsModal
-            v-show="showInstructionsModal"
-            @start="handleInstructionsStart"
-        />
+        <Teleport to="body">
+            <Transition name="help-modal">
+                <div
+                    v-if="showHelpModal"
+                    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="help-modal-title"
+                >
+                    <div
+                        class="absolute inset-0 bg-[#1f2440]/45"
+                        aria-hidden="true"
+                        @click="showHelpModal = false"
+                    ></div>
+                    <div class="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-[0_32px_80px_rgba(44,50,88,0.35)]">
+                        <h2 id="help-modal-title" class="text-xl font-bold text-[#252a45]">Помощь</h2>
+                        <p class="mt-4 text-base leading-relaxed text-[#4f556f]">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                        </p>
+                        <p class="mt-3 text-base leading-relaxed text-[#4f556f]">
+                            Curabitur pretium tincidunt lacus. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien proin quam etiam ultricies vitae, vestibulum nulla.
+                        </p>
+                        <button
+                            type="button"
+                            class="btn-brand mt-6 w-full py-3 text-sm font-semibold text-white"
+                            @click="showHelpModal = false"
+                        >
+                            Закрыть
+                        </button>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
 </template>

@@ -14,7 +14,7 @@ if (el) {
         interviewCompleted: el.dataset.interviewCompleted === '1',
         completionMessage:
             el.dataset.completionMessage ??
-            'Спасибо! Вы завершили интервью. Ваши ответы успешно сохранены.',
+            'Спасибо! Вы успешно завершили первый этап интервью.',
         firstName: el.dataset.firstName ?? '',
         lastName: el.dataset.lastName ?? '',
         positionTitle: el.dataset.positionTitle ?? '',

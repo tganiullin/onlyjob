@@ -116,13 +116,13 @@ async function onSubmit() {
             <div class="mx-auto w-full max-w-[480px]">
                 <div class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">AYA</div>
 
-                <div class="mt-32 space-y-4">
-                    <p class="text-3xl font-medium leading-tight text-[#2b2f45]">Привет 👋</p>
-                    <p class="text-xl font-light text-[#4b4f67]">Приглашаем вас пройти интервью на позицию:</p>
-                    <h1 class="mt-8 text-3xl font-bold leading-tight text-[#1f2440]">{{ positionTitle }}</h1>
+                <div class="mt-28">
+                    <p class="text-3xl font-medium leading-tight text-[#2b2f45]">Здравствуйте 👋</p>
+                    <p class="text-xl font-normal text-[#4b4f67]">Вы приглашены на собеседование на позицию</p>
+                    <h1 class="mt-8 text-5xl font-bold leading-none text-[#1f2440]">{{ positionTitle }}</h1>
                 </div>
 
-                <dl class="mt-8 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm text-[#5c6076]">
+                <dl class="mt-8 grid grid-cols-[auto_1fr] gap-x-8 gap-y-3 text-sm text-[#5c6076]">
 <!--                    <dt class="opacity-80">Компания</dt>-->
 <!--                    <dd class="text-[#2f334c]">Тест</dd>-->
 
@@ -141,8 +141,8 @@ async function onSubmit() {
         <main class="px-6 py-10 sm:px-10 bg-white">
             <div class="mx-auto flex min-h-full w-full max-w-[540px] items-center">
                 <section class="w-full space-y-6 rounded-3xl bg-white p-8 border border-[#E6E6EF]">
-                    <header class="space-y-3 text-left">
-                        <h2 class="text-xl font-bold leading-tight text-[#252a45]">
+                    <header class="mb-8 text-left">
+                        <h2 class="text-center text-2xl font-bold leading-snug text-[#252a45]">
                             Заполните форму, чтобы начать собеседование
                         </h2>
                     </header>

@@ -152,7 +152,7 @@ class PublicInterviewFlowTest extends TestCase
             ->assertOk()
             ->assertJson([
                 'completed' => true,
-                'message' => 'Спасибо! Вы завершили интервью. Ваши ответы успешно сохранены.',
+                'message' => 'Спасибо! Вы успешно завершили первый этап интервью.',
             ]);
 
         $interview->refresh();
@@ -339,7 +339,7 @@ class PublicInterviewFlowTest extends TestCase
             ->assertOk()
             ->assertJson([
                 'completed' => true,
-                'message' => 'Спасибо! Вы завершили интервью. Ваши ответы успешно сохранены.',
+                'message' => 'Спасибо! Вы успешно завершили первый этап интервью.',
             ]);
 
         $this->assertDatabaseHas('interview_questions', [
