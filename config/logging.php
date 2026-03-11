@@ -3,6 +3,7 @@
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
+use Monolog\Handler\TelegramBotHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
 return [
@@ -80,6 +81,20 @@ return [
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
             'level' => env('LOG_LEVEL', 'critical'),
             'replace_placeholders' => true,
+        ],
+
+        'telegram' => [
+            'driver' => 'monolog',
+            'handler' => TelegramBotHandler::class,
+            'level' => env('LOG_TELEGRAM_LEVEL', 'debug'),
+            'handler_with' => [
+                'apiKey' => (string) env('LOG_TELEGRAM_BOT_TOKEN', ''),
+                'channel' => (string) env('LOG_TELEGRAM_CHAT_ID', ''),
+                'parseMode' => env('LOG_TELEGRAM_PARSE_MODE', 'HTML'),
+                'splitLongMessages' => true,
+                'delayBetweenMessages' => true,
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
         ],
 
         'papertrail' => [
