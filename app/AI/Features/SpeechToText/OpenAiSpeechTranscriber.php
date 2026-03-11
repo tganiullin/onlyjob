@@ -83,6 +83,12 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
     private function createTemporaryAudioFile(UploadedFile $audioFile): string
     {
         $extension = $this->resolveAudioExtension($audioFile);
+        $sourceAudioPath = $audioFile->getRealPath();
+
+        if (! is_string($sourceAudioPath) || $sourceAudioPath === '' || ! is_file($sourceAudioPath)) {
+            throw new RuntimeException('Unable to access uploaded audio file.');
+        }
+
         $temporaryFilePath = sprintf(
             '%s/%s.%s',
             sys_get_temp_dir(),
@@ -90,7 +96,7 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
             $extension,
         );
 
-        if (! copy($audioFile->getRealPath(), $temporaryFilePath)) {
+        if (! copy($sourceAudioPath, $temporaryFilePath)) {
             throw new RuntimeException('Unable to create temporary audio file for transcription.');
         }
 

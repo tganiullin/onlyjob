@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
+use App\AI\Features\SpeechToText\Data\VoiceActivityResult;
 use App\AI\Features\SpeechToText\OpenAiSpeechTranscriber;
 use App\AI\Features\SpeechToText\VadSpeechTranscriber;
-use App\AI\Features\SpeechToText\VoiceActivityResult;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Contracts\ClientContract;

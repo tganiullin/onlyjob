@@ -2,7 +2,7 @@
 
 namespace App\AI\Features\SpeechToText\Contracts;
 
-use App\AI\Features\SpeechToText\VoiceActivityResult;
+use App\AI\Features\SpeechToText\Data\VoiceActivityResult;
 
 interface VoiceActivityDetector
 {
