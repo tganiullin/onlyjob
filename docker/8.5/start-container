@@ -5,6 +5,10 @@ if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ];
     exit 1
 fi
 
+# Remove Vite hot file so Laravel uses built assets from manifest when dev server is not running.
+# When you run `sail npm run dev`, Vite will recreate this file for HMR.
+rm -f /var/www/html/public/hot
+
 if [ ! -z "$WWWUSER" ]; then
     usermod -u $WWWUSER sail
 fi
