@@ -5,7 +5,124 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+@font-face {
+    font-family: 'Pragmatica';
+    src: url('../fonts/pragmatica_light.woff2') format('woff2');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pragmatica';
+    src: url('../fonts/pragmatica_book.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pragmatica';
+    src: url('../fonts/pragmatica_medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pragmatica';
+    src: url('../fonts/pragmatica_bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pragmatica';
+    src: url('../fonts/pragmatica_black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Pragmatica', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-brand: #1469d2;
+    --color-brand-hover: #0d5ab8;
+    --color-brand-active: #0a4a9a;
+    --color-brand-disabled: #a0c8f0;
+}
+
+@layer components {
+    .btn-brand {
+        background-color: var(--color-brand);
+        cursor: pointer;
+        border-radius: 1rem;
+        transition: background-color 0.2s ease;
+    }
+    .btn-brand:hover:not(:disabled) {
+        background-color: var(--color-brand-hover);
+    }
+    .btn-brand:active:not(:disabled) {
+        background-color: var(--color-brand-active);
+    }
+    .btn-brand:disabled {
+        background-color: var(--color-brand-disabled);
+        cursor: not-allowed;
+    }
+    .input-field {
+        @apply h-12 w-full rounded-xl border bg-white px-3 text-sm text-[#1f2440] outline-none transition;
+        border-color: #d8dcf2;
+    }
+    .input-field:focus {
+        border-color: var(--color-brand);
+    }
+    .input-field.input-field--invalid {
+        border-color: #dc2626;
+    }
+    .checkbox-consent {
+        @apply flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-[#ccd2ed] bg-white transition;
+    }
+    .checkbox-consent--checked {
+        background-color: var(--color-brand);
+        border-color: var(--color-brand);
+    }
+}
+
+@keyframes chat-message-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.chat-bubble {
+    font-family: var(--font-sans);
+    animation: chat-message-in 0.25s ease-out forwards;
+}
+
+.chat-message-enter-active {
+    transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+.chat-message-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+}
+.chat-message-enter-to {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.help-modal-enter-active,
+.help-modal-leave-active {
+    transition: opacity 0.2s ease;
+}
+.help-modal-enter-from,
+.help-modal-leave-to {
+    opacity: 0;
 }

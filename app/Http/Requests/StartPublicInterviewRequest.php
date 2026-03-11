@@ -35,11 +35,11 @@ class StartPublicInterviewRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'first_name.required' => 'Please enter your first name.',
-            'last_name.required' => 'Please enter your last name.',
-            'email.required' => 'Please enter your email address.',
-            'email.email' => 'Please enter a valid email address.',
-            'consent.accepted' => 'You need to accept personal data processing to continue.',
+            'first_name.required' => 'Укажите имя.',
+            'last_name.required' => 'Укажите фамилию.',
+            'email.required' => 'Укажите электронную почту.',
+            'email.email' => 'Укажите корректный адрес электронной почты.',
+            'consent.accepted' => 'Необходимо дать согласие на обработку персональных данных.',
         ];
     }
 }

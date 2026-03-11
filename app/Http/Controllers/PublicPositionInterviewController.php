@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StartPublicInterviewRequest;
 use App\Models\Interview;
 use App\Models\Position;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -17,7 +18,7 @@ class PublicPositionInterviewController extends Controller
         ]);
     }
 
-    public function start(StartPublicInterviewRequest $request, string $token): RedirectResponse
+    public function start(StartPublicInterviewRequest $request, string $token): RedirectResponse|JsonResponse
     {
         $position = $this->findPublicPositionByToken($token);
 
@@ -31,6 +32,12 @@ class PublicPositionInterviewController extends Controller
         );
 
         $request->session()->put('public_interview_id', $interview->id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'redirect' => route('public-interviews.run', ['interview' => $interview]),
+            ]);
+        }
 
         return redirect()->route('public-interviews.run', [
             'interview' => $interview,
