@@ -1,32 +1,48 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const PREP_SECONDS = 120;
+
+const props = defineProps({
     firstName: { type: String, default: '' },
     lastName: { type: String, default: '' },
     positionTitle: { type: String, default: '' },
     questionsCount: { type: Number, default: 0 },
+    answerTimeSeconds: { type: Number, default: 120 },
 });
 defineEmits(['start']);
+
+const totalTimeLabel = computed(() => {
+    const totalSec = props.questionsCount * props.answerTimeSeconds + PREP_SECONDS;
+    const totalMin = Math.round(totalSec / 60);
+    if (totalMin < 60) return `${totalMin} мин`;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return m > 0 ? `${h} ч ${m} мин` : `${h} ч`;
+});
 </script>
 
 <template>
     <section class="grid min-h-[78vh] items-center gap-16 lg:grid-cols-[1.2fr_1fr]">
-        <div class="space-y-5">
-            <p class="text-[22px] text-[#353a56]">Привет, {{ firstName }} {{ lastName }}</p>
-            <p class="text-sm text-[#5b617d]">Приглашам вас пройти интервью на позицию:</p>
-            <h1 class="text-[58px] font-bold leading-tight text-[#202541]">{{ positionTitle }}</h1>
+        <div class="max-w-[480px] space-y-5">
+            <p class="text-2xl text-[#353a56]">Привет, {{ firstName }} {{ lastName }}</p>
+            <p class="text-base text-[#5b617d]">Приглашаем вас пройти интервью на позицию:</p>
+            <h1 class="text-3xl font-bold leading-tight text-[#202541]">{{ positionTitle }}</h1>
 
-            <dl class="mt-6 grid max-w-[360px] grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm text-[#5f6481]">
+            <dl class="mt-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm text-[#5f6481]">
                 <dt>Компания</dt>
                 <dd class="text-[#2f334d]">Тест</dd>
                 <dt>Язык</dt>
                 <dd class="text-[#2f334d]">Русский / English</dd>
                 <dt>Всего вопросов</dt>
                 <dd class="text-[#2f334d]">{{ questionsCount }}</dd>
+                <dt>Время</dt>
+                <dd class="text-[#2f334d]">{{ totalTimeLabel }}</dd>
             </dl>
 
             <button
                 type="button"
-                class="mt-6 inline-flex h-14 min-w-[260px] items-center justify-center rounded-full bg-[#1b045f] px-10 text-sm font-semibold text-white shadow-[0_6px_0_rgba(112,102,189,0.55)] transition hover:bg-[#250875]"
+                class="btn-brand mt-6 inline-flex h-14 min-w-[260px] cursor-pointer items-center justify-center px-10 text-sm font-semibold text-white"
                 @click="$emit('start')"
             >
                 Начать

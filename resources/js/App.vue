@@ -257,7 +257,7 @@ function handleSkipAnswer() {
 <template>
     <div class="relative min-h-screen overflow-hidden">
         <aside class="fixed inset-y-0 left-0 w-[270px] bg-[#dce2f8] px-12 py-10">
-            <div class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">LARAVEL</div>
+            <div class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">AYA</div>
         </aside>
 
         <main class="min-h-screen pl-[270px]">
@@ -270,6 +270,7 @@ function handleSkipAnswer() {
                     :last-name="lastName"
                     :position-title="positionTitle"
                     :questions-count="questions.length"
+                    :answer-time-seconds="answerTimeSeconds"
                     @start="handleStartFlow"
                 />
 

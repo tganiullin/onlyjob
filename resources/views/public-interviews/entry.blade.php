@@ -13,6 +13,8 @@
     data-submit-url="{{ route('public-positions.start', ['token' => $position->public_token]) }}"
     data-position-title="{{ $position->title }}"
     data-questions-count="{{ $position->questions_count }}"
+    data-answer-time-seconds="{{ $position->answer_time_seconds?->value ?? 120 }}"
+    data-policy-url="{{ url('/policy') }}"
 ></div>
 </body>
 </html>
