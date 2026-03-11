@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\InterviewStatus;
+use App\Filament\Resources\Interviews\Pages\ListInterviews;
 use App\Models\Interview;
 use App\Models\Position;
 use App\Models\Question;
+use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class InterviewTest extends TestCase
@@ -148,5 +152,48 @@ class InterviewTest extends TestCase
 
         $this->assertSame(InterviewStatus::Pending, $pendingInterview->fresh()->status);
         $this->assertSame(InterviewStatus::Completed, $completedInterview->fresh()->status);
+    }
+
+    public function test_admin_list_can_filter_interviews_by_status_and_position(): void
+    {
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $backendPosition = Position::factory()->create([
+            'title' => 'Backend Engineer',
+        ]);
+
+        $frontendPosition = Position::factory()->create([
+            'title' => 'Frontend Engineer',
+        ]);
+
+        $pendingBackendInterview = Interview::factory()->create([
+            'position_id' => $backendPosition->id,
+            'status' => InterviewStatus::Pending->value,
+        ]);
+
+        $completedBackendInterview = Interview::factory()->create([
+            'position_id' => $backendPosition->id,
+            'status' => InterviewStatus::Completed->value,
+            'completed_at' => now(),
+        ]);
+
+        $passedFrontendInterview = Interview::factory()->create([
+            'position_id' => $frontendPosition->id,
+            'status' => InterviewStatus::Passed->value,
+            'completed_at' => now(),
+        ]);
+
+        Livewire::test(ListInterviews::class)
+            ->assertTableFilterVisible('status')
+            ->assertTableFilterVisible('position_id')
+            ->assertTableFilterVisible('completed_at')
+            ->filterTable('status', InterviewStatus::Pending->value)
+            ->assertCanSeeTableRecords([$pendingBackendInterview])
+            ->assertCanNotSeeTableRecords([$completedBackendInterview, $passedFrontendInterview])
+            ->removeTableFilter('status')
+            ->filterTable('position_id', $backendPosition->id)
+            ->assertCanSeeTableRecords([$pendingBackendInterview, $completedBackendInterview])
+            ->assertCanNotSeeTableRecords([$passedFrontendInterview]);
     }
 }

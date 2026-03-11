@@ -10,6 +10,8 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class InterviewsTable
@@ -51,7 +53,19 @@ class InterviewsTable
                     ->sortable(),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options(InterviewStatus::class),
+                SelectFilter::make('position_id')
+                    ->label('Position')
+                    ->relationship('position', 'title')
+                    ->searchable()
+                    ->preload(),
+                TernaryFilter::make('completed_at')
+                    ->label('Completed')
+                    ->nullable()
+                    ->placeholder('All')
+                    ->trueLabel('Completed')
+                    ->falseLabel('Not completed'),
             ])
             ->recordActions([
                 Action::make('queueAiReview')
