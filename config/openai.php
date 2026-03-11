@@ -46,4 +46,14 @@ return [
     */
 
     'request_timeout' => env('OPENAI_REQUEST_TIMEOUT', 30),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Proxy
+    |--------------------------------------------------------------------------
+    |
+    | Optional proxy URL for OpenAI HTTP requests (for example:
+    | socks5://127.0.0.1:1080 or http://127.0.0.1:8080).
+    */
+    'proxy' => env('OPENAI_PROXY'),
 ];

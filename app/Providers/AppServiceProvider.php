@@ -10,10 +10,13 @@ use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
 use App\AI\Features\SpeechToText\FfmpegVoiceActivityDetector;
 use App\AI\Features\SpeechToText\VadSpeechTranscriber;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use OpenAI\Contracts\ClientContract;
+use OpenAI\Exceptions\ApiKeyIsMissing;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(QuestionGenerator::class, AiQuestionGenerator::class);
         $this->app->bind(VoiceActivityDetector::class, FfmpegVoiceActivityDetector::class);
         $this->app->bind(SpeechTranscriber::class, VadSpeechTranscriber::class);
+        $this->extendOpenAiClientWithProxySupport();
     }
 
     /**
@@ -55,6 +59,46 @@ class AppServiceProvider extends ServiceProvider
                 (string) $request->ip(),
                 $this->resolveRouteSegmentKey($request, 'interview'),
             ));
+        });
+    }
+
+    private function extendOpenAiClientWithProxySupport(): void
+    {
+        $this->app->extend(ClientContract::class, function (ClientContract $client): ClientContract {
+            $proxy = trim((string) config('openai.proxy', ''));
+
+            if ($proxy === '') {
+                return $client;
+            }
+
+            $apiKey = config('openai.api_key');
+            $organization = config('openai.organization');
+            $project = config('openai.project');
+            $baseUri = config('openai.base_uri');
+
+            if (! is_string($apiKey) || ($organization !== null && ! is_string($organization))) {
+                throw ApiKeyIsMissing::create();
+            }
+
+            $httpClientOptions = [
+                'timeout' => config('openai.request_timeout', 30),
+                'proxy' => $proxy,
+            ];
+
+            $clientFactory = \OpenAI::factory()
+                ->withApiKey($apiKey)
+                ->withOrganization($organization)
+                ->withHttpClient(new GuzzleClient($httpClientOptions));
+
+            if (is_string($project)) {
+                $clientFactory->withProject($project);
+            }
+
+            if (is_string($baseUri)) {
+                $clientFactory->withBaseUri($baseUri);
+            }
+
+            return $clientFactory->make();
         });
     }
 
