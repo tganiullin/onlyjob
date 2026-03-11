@@ -7,7 +7,9 @@ use App\AI\Features\InterviewReview\Contracts\InterviewReviewer;
 use App\AI\Features\QuestionGeneration\AiQuestionGenerator;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
-use App\AI\Features\SpeechToText\OpenAiSpeechTranscriber;
+use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
+use App\AI\Features\SpeechToText\FfmpegVoiceActivityDetector;
+use App\AI\Features\SpeechToText\VadSpeechTranscriber;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -22,7 +24,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(InterviewReviewer::class, AiInterviewReviewer::class);
         $this->app->bind(QuestionGenerator::class, AiQuestionGenerator::class);
-        $this->app->bind(SpeechTranscriber::class, OpenAiSpeechTranscriber::class);
+        $this->app->bind(VoiceActivityDetector::class, FfmpegVoiceActivityDetector::class);
+        $this->app->bind(SpeechTranscriber::class, VadSpeechTranscriber::class);
     }
 
     /**

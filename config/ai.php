@@ -31,8 +31,16 @@ return [
         ],
         'speech_to_text' => [
             'provider' => env('AI_SPEECH_TO_TEXT_PROVIDER', env('AI_PROVIDER', 'openai')),
-            'model' => env('AI_SPEECH_TO_TEXT_MODEL', env('AI_OPENAI_STT_MODEL', 'gpt-4o-mini-transcribe')),
-            'temperature' => (float) env('AI_SPEECH_TO_TEXT_TEMPERATURE', env('AI_OPENAI_STT_TEMPERATURE', 0)),
+            'model' => env('AI_SPEECH_TO_TEXT_MODEL', 'gpt-4o-mini-transcribe'),
+            'temperature' => (float) env('AI_SPEECH_TO_TEXT_TEMPERATURE', 0),
+            'vad' => [
+                'enabled' => (bool) env('AI_SPEECH_TO_TEXT_VAD_ENABLED', true),
+                'noise_threshold_db' => (float) env('AI_SPEECH_TO_TEXT_VAD_NOISE_THRESHOLD_DB', -45),
+                'min_silence_seconds' => (float) env('AI_SPEECH_TO_TEXT_VAD_MIN_SILENCE_SECONDS', 0.2),
+                'min_speech_seconds' => (float) env('AI_SPEECH_TO_TEXT_VAD_MIN_SPEECH_SECONDS', 0.5),
+                'timeout_seconds' => (int) env('AI_SPEECH_TO_TEXT_VAD_TIMEOUT_SECONDS', 5),
+                'fail_open' => (bool) env('AI_SPEECH_TO_TEXT_VAD_FAIL_OPEN', true),
+            ],
         ],
     ],
 ];
