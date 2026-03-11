@@ -74,6 +74,9 @@ class CheckInterviewJobTest extends TestCase
         $this->assertNotEmpty($provider->requests[0]->systemPrompt);
         $this->assertNotEmpty($provider->requests[0]->userPrompt);
         $this->assertStringContainsString('Russian', $provider->requests[0]->systemPrompt);
+        $this->assertStringNotContainsString((string) $interview->first_name, $provider->requests[0]->userPrompt);
+        $this->assertStringNotContainsString((string) $interview->last_name, $provider->requests[0]->userPrompt);
+        $this->assertStringNotContainsString((string) $interview->email, $provider->requests[0]->userPrompt);
 
         $this->assertDatabaseHas('interviews', [
             'id' => $interview->id,

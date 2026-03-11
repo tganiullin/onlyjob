@@ -87,11 +87,6 @@ PROMPT;
                 'level' => $interview->position?->level?->value,
                 'minimum_score' => $interview->position?->minimum_score,
             ],
-            'candidate' => [
-                'first_name' => $interview->first_name,
-                'last_name' => $interview->last_name,
-                'email' => $interview->email,
-            ],
             'interview' => [
                 'id' => $interview->id,
                 'status' => $interview->status->value,

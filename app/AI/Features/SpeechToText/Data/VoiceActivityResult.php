@@ -1,6 +1,6 @@
 <?php
 
-namespace App\AI\Features\SpeechToText;
+namespace App\AI\Features\SpeechToText\Data;
 
 final readonly class VoiceActivityResult
 {

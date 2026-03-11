@@ -3,6 +3,7 @@
 namespace App\AI\Features\SpeechToText;
 
 use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
+use App\AI\Features\SpeechToText\Data\VoiceActivityResult;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Process;
 use Throwable;
