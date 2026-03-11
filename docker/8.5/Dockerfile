@@ -86,6 +86,6 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY php.ini /etc/php/8.5/cli/conf.d/99-sail.ini
 RUN chmod +x /usr/local/bin/start-container
 
-EXPOSE 80/tcp
+EXPOSE 80/tcp 5173/tcp
 
 ENTRYPOINT ["start-container"]

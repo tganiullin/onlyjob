@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
+    cacheDir: process.env.LARAVEL_SAIL ? '/tmp/vite' : undefined,
     plugins: [
         laravel({
             input: [
@@ -18,8 +19,15 @@ export default defineConfig({
         tailwindcss(),
     ],
     server: {
+        host: true,
+        port: 5173,
+        hmr: {
+            host: 'localhost',
+            port: 5173,
+        },
         watch: {
             ignored: ['**/storage/framework/views/**'],
+            usePolling: true,
         },
     },
 });
