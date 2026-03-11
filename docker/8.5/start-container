@@ -13,13 +13,6 @@ if [ ! -z "$WWWUSER" ]; then
     usermod -u $WWWUSER sail
 fi
 
-# Ensure Vite can write cache and temp files when running as sail in the container.
-if [ -d /var/www/html/node_modules ]; then
-    mkdir -p /var/www/html/node_modules/.vite-temp /var/www/html/node_modules/.vite
-    chown -R sail:sail /var/www/html/node_modules/.vite-temp /var/www/html/node_modules/.vite
-    chmod -R 777 /var/www/html/node_modules/.vite-temp /var/www/html/node_modules/.vite
-fi
-
 if [ ! -d /.composer ]; then
     mkdir /.composer
 fi
