@@ -53,7 +53,7 @@ class PublicInterviewFlowTest extends TestCase
         $response = $this->post(route('public-positions.start', ['token' => $position->public_token]), [
             'first_name' => 'John',
             'last_name' => 'Doe',
-            'email' => 'john.doe@example.com',
+            'telegram' => '@john_doe',
             'consent' => '1',
         ]);
 
@@ -67,7 +67,8 @@ class PublicInterviewFlowTest extends TestCase
             'position_id' => $position->id,
             'first_name' => 'John',
             'last_name' => 'Doe',
-            'email' => 'john.doe@example.com',
+            'email' => null,
+            'telegram' => '@john_doe',
             'status' => InterviewStatus::Pending->value,
         ]);
 
@@ -79,6 +80,27 @@ class PublicInterviewFlowTest extends TestCase
             'sort_order' => 1,
             'evaluation_instructions_snapshot' => 'Look for ownership and measurable impact.',
         ]);
+    }
+
+    public function test_start_requires_telegram_account(): void
+    {
+        $position = Position::factory()->public()->create([
+            'public_token' => 'public-position-token',
+        ]);
+
+        Question::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $response = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'consent' => '1',
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['telegram']);
     }
 
     public function test_answer_flow_saves_answers_and_marks_interview_as_completed_after_last_question(): void
@@ -100,7 +122,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->post(route('public-positions.start', ['token' => $position->public_token]), [
             'first_name' => 'Jane',
             'last_name' => 'Smith',
-            'email' => 'jane.smith@example.com',
+            'telegram' => '@jane_smith',
             'consent' => '1',
         ]);
 
@@ -184,7 +206,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->post(route('public-positions.start', ['token' => $position->public_token]), [
             'first_name' => 'Jane',
             'last_name' => 'Smith',
-            'email' => 'jane.smith@example.com',
+            'telegram' => '@jane_smith',
             'consent' => '1',
         ]);
 
@@ -258,7 +280,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->post(route('public-positions.start', ['token' => $position->public_token]), [
             'first_name' => 'Nora',
             'last_name' => 'Hall',
-            'email' => 'nora.hall@example.com',
+            'telegram' => '@nora_hall',
             'consent' => '1',
         ]);
 

@@ -24,7 +24,8 @@ class StartPublicInterviewRequest extends FormRequest
         return [
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255'],
+            'email' => ['nullable', 'string', 'email', 'max:255'],
+            'telegram' => ['required', 'string', 'max:255'],
             'consent' => ['accepted'],
         ];
     }
@@ -37,8 +38,8 @@ class StartPublicInterviewRequest extends FormRequest
         return [
             'first_name.required' => 'Укажите имя.',
             'last_name.required' => 'Укажите фамилию.',
-            'email.required' => 'Укажите электронную почту.',
             'email.email' => 'Укажите корректный адрес электронной почты.',
+            'telegram.required' => 'Укажите Telegram аккаунт.',
             'consent.accepted' => 'Необходимо дать согласие на обработку персональных данных.',
         ];
     }

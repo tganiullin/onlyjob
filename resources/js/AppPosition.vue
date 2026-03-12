@@ -14,22 +14,23 @@ const props = defineProps({
 const form = reactive({
     first_name: '',
     last_name: '',
-    email: '',
+    telegram: '',
     consent: false,
 });
 const errors = reactive({
     first_name: [],
     last_name: [],
-    email: [],
+    telegram: [],
     consent: [],
 });
 const submitted = reactive({
     first_name: false,
     last_name: false,
-    email: false,
+    telegram: false,
     consent: false,
 });
 const submitting = ref(false);
+const submitError = ref('');
 
 const totalTimeLabel = computed(() => {
     const count = Number(props.questionsCount) || 0;
@@ -47,28 +48,28 @@ function getCsrfToken() {
 }
 
 function validate() {
-    const e = { first_name: [], last_name: [], email: [], consent: [] };
+    const e = { first_name: [], last_name: [], telegram: [], consent: [] };
     if (!form.first_name.trim()) e.first_name.push('Укажите имя.');
     if (!form.last_name.trim()) e.last_name.push('Укажите фамилию.');
-    if (!form.email.trim()) e.email.push('Укажите электронную почту.');
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email.push('Укажите корректный адрес электронной почты.');
+    if (!form.telegram.trim()) e.telegram.push('Укажите Telegram аккаунт.');
     if (!form.consent) e.consent.push('Необходимо дать согласие на обработку персональных данных.');
     Object.assign(errors, e);
     submitted.first_name = true;
     submitted.last_name = true;
-    submitted.email = true;
+    submitted.telegram = true;
     submitted.consent = true;
-    return e.first_name.length + e.last_name.length + e.email.length + e.consent.length === 0;
+    return e.first_name.length + e.last_name.length + e.telegram.length + e.consent.length === 0;
 }
 
 function setErrors(payload) {
     errors.first_name = payload?.errors?.first_name ?? [];
     errors.last_name = payload?.errors?.last_name ?? [];
-    errors.email = payload?.errors?.email ?? [];
+    errors.telegram = payload?.errors?.telegram ?? [];
     errors.consent = payload?.errors?.consent ?? [];
 }
 
 async function onSubmit() {
+    submitError.value = '';
     setErrors({});
     if (!validate()) {
         submitting.value = false;
@@ -88,7 +89,7 @@ async function onSubmit() {
             body: JSON.stringify({
                 first_name: form.first_name.trim(),
                 last_name: form.last_name.trim(),
-                email: form.email.trim(),
+                telegram: form.telegram.trim(),
                 consent: form.consent ? '1' : '',
             }),
         });
@@ -97,7 +98,7 @@ async function onSubmit() {
 
         if (!response.ok) {
             if (response.status === 422) setErrors(data);
-            else errors.email = [data?.message ?? 'Произошла ошибка. Попробуйте ещё раз.'];
+            else submitError.value = data?.message ?? 'Произошла ошибка. Попробуйте ещё раз.';
             return;
         }
 
@@ -179,17 +180,17 @@ async function onSubmit() {
                         </div>
 
                         <div>
-                            <label for="email" class="mb-1.5 block text-sm font-medium text-[#636985]">Электронная почта</label>
+                            <label for="telegram" class="mb-1.5 block text-sm font-medium text-[#636985]">Telegram</label>
                             <input
-                                id="email"
-                                v-model="form.email"
-                                type="email"
-                                autocomplete="email"
+                                id="telegram"
+                                v-model="form.telegram"
+                                type="text"
+                                autocomplete="username"
                                 class="input-field"
-                                :class="{ 'input-field--invalid': errors.email.length > 0 }"
-                                @blur="submitted.email = true"
+                                :class="{ 'input-field--invalid': errors.telegram.length > 0 }"
+                                @blur="submitted.telegram = true"
                             >
-                            <p v-for="msg in errors.email" :key="msg" class="text-xs text-red-600">{{ msg }}</p>
+                            <p v-for="msg in errors.telegram" :key="msg" class="text-xs text-red-600">{{ msg }}</p>
                         </div>
 
                         <div>
@@ -212,6 +213,8 @@ async function onSubmit() {
                             </label>
                             <p v-for="msg in errors.consent" :key="msg" class="text-xs text-red-600">{{ msg }}</p>
                         </div>
+
+                        <p v-if="submitError" class="text-sm text-red-600">{{ submitError }}</p>
 
                         <button
                             type="submit"

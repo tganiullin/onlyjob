@@ -21,6 +21,7 @@ class Interview extends Model
         'first_name',
         'last_name',
         'email',
+        'telegram',
         'phone',
         'status',
         'score',
@@ -102,7 +103,7 @@ class Interview extends Model
     }
 
     /**
-     * @param  array{first_name: string, last_name: string, email: string, phone?: string|null}  $candidateData
+     * @param  array{first_name: string, last_name: string, telegram: string, email?: string|null, phone?: string|null}  $candidateData
      */
     public static function createPendingForCandidate(Position $position, array $candidateData): self
     {
@@ -110,7 +111,8 @@ class Interview extends Model
             'position_id' => $position->id,
             'first_name' => $candidateData['first_name'],
             'last_name' => $candidateData['last_name'],
-            'email' => $candidateData['email'],
+            'email' => $candidateData['email'] ?? null,
+            'telegram' => $candidateData['telegram'],
             'phone' => $candidateData['phone'] ?? null,
             'status' => InterviewStatus::Pending,
             'started_at' => now(),

@@ -23,6 +23,7 @@ class InterviewFactory extends Factory
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
             'email' => fake()->unique()->safeEmail(),
+            'telegram' => '@'.fake()->unique()->userName(),
             'phone' => fake()->optional()->phoneNumber(),
             'status' => InterviewStatus::Pending->value,
             'score' => null,
