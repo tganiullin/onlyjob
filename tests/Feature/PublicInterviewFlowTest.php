@@ -5,11 +5,14 @@ namespace Tests\Feature;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
 use App\Models\Interview;
+use App\Models\InterviewTelegramConfirmation;
 use App\Models\Position;
 use App\Models\Question;
+use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class PublicInterviewFlowTest extends TestCase
@@ -30,7 +33,7 @@ class PublicInterviewFlowTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_start_creates_new_pending_interview_from_public_position(): void
+    public function test_start_creates_pending_confirmation_flow_without_creating_interview(): void
     {
         $position = Position::factory()->public()->create([
             'public_token' => 'public-position-token',
@@ -50,36 +53,42 @@ class PublicInterviewFlowTest extends TestCase
             'evaluation_instructions' => 'Check prioritization and communication.',
         ]);
 
-        $response = $this->post(route('public-positions.start', ['token' => $position->public_token]), [
+        $response = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), [
             'first_name' => 'John',
             'last_name' => 'Doe',
-            'telegram' => '@john_doe',
+            'telegram' => '@John_Doe',
+            'client_request_id' => '95d22f4d-d852-4f30-8266-9a7f3dbdc18a',
             'consent' => '1',
         ]);
 
-        $interview = Interview::query()->firstOrFail();
+        $response
+            ->assertOk()
+            ->assertJson([
+                'status' => 'pending_confirmation',
+            ])
+            ->assertJsonStructure([
+                'status',
+                'status_token',
+                'status_endpoint',
+                'telegram_deeplink',
+            ]);
 
-        $response->assertRedirect(route('public-interviews.run', ['interview' => $interview]));
-        $response->assertSessionHas('public_interview_id', $interview->id);
+        $statusToken = $response->json('status_token');
 
-        $this->assertDatabaseHas('interviews', [
-            'id' => $interview->id,
+        $this->assertNotEmpty($statusToken);
+        $this->assertSame($statusToken, session('public_pending_confirmation_status_token'));
+
+        $this->assertDatabaseHas('interview_telegram_confirmations', [
             'position_id' => $position->id,
             'first_name' => 'John',
             'last_name' => 'Doe',
-            'email' => null,
-            'telegram' => '@john_doe',
-            'status' => InterviewStatus::Pending->value,
+            'expected_username' => 'john_doe',
+            'status_token' => $statusToken,
+            'interview_id' => null,
         ]);
 
-        $this->assertCount(2, $interview->fresh()->interviewQuestions);
-
-        $this->assertDatabaseHas('interview_questions', [
-            'interview_id' => $interview->id,
-            'question_text' => 'Tell about your recent project.',
-            'sort_order' => 1,
-            'evaluation_instructions_snapshot' => 'Look for ownership and measurable impact.',
-        ]);
+        $this->assertDatabaseCount('interviews', 0);
+        $this->assertDatabaseCount('interview_questions', 0);
     }
 
     public function test_start_requires_telegram_account(): void
@@ -95,12 +104,152 @@ class PublicInterviewFlowTest extends TestCase
         $response = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), [
             'first_name' => 'John',
             'last_name' => 'Doe',
+            'client_request_id' => 'f960250f-9a0d-4fdf-83ff-608f668793c4',
             'consent' => '1',
         ]);
 
         $response
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['telegram']);
+    }
+
+    public function test_start_reuses_pending_flow_for_same_client_request_id(): void
+    {
+        $position = Position::factory()->public()->create([
+            'public_token' => 'public-position-token',
+        ]);
+
+        Question::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $payload = [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'telegram' => '@john_doe',
+            'client_request_id' => '1f6d2ccf-5bc0-4638-8ecc-699cfbe99d16',
+            'consent' => '1',
+        ];
+
+        $firstResponse = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), $payload);
+        $secondResponse = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), $payload);
+
+        $firstResponse->assertOk();
+        $secondResponse->assertOk();
+
+        $this->assertSame(
+            $firstResponse->json('status_token'),
+            $secondResponse->json('status_token'),
+        );
+
+        $this->assertDatabaseCount('interview_telegram_confirmations', 1);
+    }
+
+    public function test_start_reuses_pending_flow_for_same_candidate_data_with_new_client_request_id(): void
+    {
+        $position = Position::factory()->public()->create([
+            'public_token' => 'public-position-token',
+        ]);
+
+        Question::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $firstResponse = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'telegram' => '@john_doe',
+            'client_request_id' => '33a4f2ab-f241-445f-a9af-6b84cb24ce4b',
+            'consent' => '1',
+        ]);
+
+        $secondResponse = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'telegram' => '@john_doe',
+            'client_request_id' => '0050beca-8c03-4e97-8f2d-f128194ee044',
+            'consent' => '1',
+        ]);
+
+        $firstResponse->assertOk();
+        $secondResponse->assertOk();
+
+        $this->assertSame(
+            $firstResponse->json('status_token'),
+            $secondResponse->json('status_token'),
+        );
+
+        $this->assertDatabaseCount('interview_telegram_confirmations', 1);
+    }
+
+    public function test_run_endpoint_is_forbidden_when_interview_is_not_telegram_confirmed(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'What is MVC?',
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'telegram_confirmed_at' => null,
+            'telegram_user_id' => null,
+            'telegram_chat_id' => null,
+            'telegram_confirmed_username' => null,
+        ]);
+
+        $this->withSession(['public_interview_id' => $interview->id])
+            ->get(route('public-interviews.run', ['interview' => $interview]))
+            ->assertForbidden();
+    }
+
+    public function test_confirmation_status_promotes_session_after_telegram_confirmation(): void
+    {
+        $position = Position::factory()->public()->create([
+            'public_token' => 'public-position-token',
+        ]);
+
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'First question?',
+        ]);
+
+        $startResponse = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), [
+            'first_name' => 'Jane',
+            'last_name' => 'Smith',
+            'telegram' => '@jane_smith',
+            'client_request_id' => '4ad30165-e88e-494e-ab5f-7560f8bf5f37',
+            'consent' => '1',
+        ]);
+
+        $startResponse->assertOk()->assertJson(['status' => 'pending_confirmation']);
+
+        $statusToken = (string) $startResponse->json('status_token');
+
+        app(TelegramAccountConfirmationService::class)->confirmByTokenAndUsername($statusToken, [
+            'username' => 'jane_smith',
+            'user_id' => 111111,
+            'chat_id' => 111111,
+            'chat_type' => 'private',
+            'update_id' => 222222,
+        ]);
+
+        $statusResponse = $this->getJson(route('public-positions.confirmation-status', [
+            'token' => $position->public_token,
+            'statusToken' => $statusToken,
+        ]));
+
+        $statusResponse
+            ->assertOk()
+            ->assertJson([
+                'status' => 'confirmed',
+            ])
+            ->assertJsonStructure(['redirect']);
+
+        $interview = Interview::query()->firstOrFail();
+        $this->assertSame($interview->id, session('public_interview_id'));
     }
 
     public function test_answer_flow_saves_answers_and_marks_interview_as_completed_after_last_question(): void
@@ -119,16 +268,11 @@ class PublicInterviewFlowTest extends TestCase
             'text' => 'Second question?',
         ]);
 
-        $this->post(route('public-positions.start', ['token' => $position->public_token]), [
+        $interview = $this->startAndConfirmInterview($position, [
             'first_name' => 'Jane',
             'last_name' => 'Smith',
             'telegram' => '@jane_smith',
-            'consent' => '1',
-        ]);
-
-        $interview = Interview::query()
-            ->with('interviewQuestions')
-            ->firstOrFail();
+        ])->load('interviewQuestions');
 
         $firstInterviewQuestion = $interview->interviewQuestions->sortBy('sort_order')->values()[0];
         $secondInterviewQuestion = $interview->interviewQuestions->sortBy('sort_order')->values()[1];
@@ -203,16 +347,11 @@ class PublicInterviewFlowTest extends TestCase
             'text' => 'Second question?',
         ]);
 
-        $this->post(route('public-positions.start', ['token' => $position->public_token]), [
+        $interview = $this->startAndConfirmInterview($position, [
             'first_name' => 'Jane',
             'last_name' => 'Smith',
             'telegram' => '@jane_smith',
-            'consent' => '1',
-        ]);
-
-        $interview = Interview::query()
-            ->with('interviewQuestions')
-            ->firstOrFail();
+        ])->load('interviewQuestions');
 
         $firstInterviewQuestion = $interview->interviewQuestions->sortBy('sort_order')->values()[0];
         $secondInterviewQuestion = $interview->interviewQuestions->sortBy('sort_order')->values()[1];
@@ -277,14 +416,11 @@ class PublicInterviewFlowTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        $this->post(route('public-positions.start', ['token' => $position->public_token]), [
+        $interview = $this->startAndConfirmInterview($position, [
             'first_name' => 'Nora',
             'last_name' => 'Hall',
             'telegram' => '@nora_hall',
-            'consent' => '1',
         ]);
-
-        $interview = Interview::query()->firstOrFail();
 
         $fakeSpeechTranscriber = new class implements SpeechTranscriber
         {
@@ -346,6 +482,10 @@ class PublicInterviewFlowTest extends TestCase
             'position_id' => $position->id,
             'status' => InterviewStatus::Passed->value,
             'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 123456,
+            'telegram_chat_id' => 123456,
+            'telegram_confirmed_username' => 'terminal_user',
         ]);
         $interviewQuestion = $interview->interviewQuestions()->firstOrFail();
 
@@ -411,6 +551,10 @@ class PublicInterviewFlowTest extends TestCase
             'position_id' => $position->id,
             'status' => InterviewStatus::Completed,
             'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 223456,
+            'telegram_chat_id' => 223456,
+            'telegram_confirmed_username' => 'completed_user',
         ]);
 
         $interviewQuestion = $interview->interviewQuestions()->firstOrFail();
@@ -439,6 +583,10 @@ class PublicInterviewFlowTest extends TestCase
             'position_id' => $position->id,
             'status' => InterviewStatus::Passed->value,
             'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 323456,
+            'telegram_chat_id' => 323456,
+            'telegram_confirmed_username' => 'passed_user',
         ]);
 
         $response = $this->withSession(['public_interview_id' => $interview->id])
@@ -472,15 +620,77 @@ class PublicInterviewFlowTest extends TestCase
     public function test_public_post_routes_are_protected_by_rate_limiters(): void
     {
         $startRoute = Route::getRoutes()->getByName('public-positions.start');
+        $confirmationStatusRoute = Route::getRoutes()->getByName('public-positions.confirmation-status');
         $transcribeRoute = Route::getRoutes()->getByName('public-interviews.transcribe');
         $answerRoute = Route::getRoutes()->getByName('public-interviews.questions.answer');
 
         $this->assertNotNull($startRoute);
+        $this->assertNotNull($confirmationStatusRoute);
         $this->assertNotNull($transcribeRoute);
         $this->assertNotNull($answerRoute);
 
         $this->assertContains('throttle:public-position-start', $startRoute->gatherMiddleware());
+        $this->assertContains('throttle:public-interview-confirmation-status', $confirmationStatusRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-transcribe', $transcribeRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $answerRoute->gatherMiddleware());
+    }
+
+    /**
+     * @param  array{first_name?: string, last_name?: string, telegram?: string}  $payload
+     */
+    private function startAndConfirmInterview(Position $position, array $payload = []): Interview
+    {
+        $payload = array_merge([
+            'first_name' => 'Jane',
+            'last_name' => 'Smith',
+            'telegram' => '@jane_smith',
+            'client_request_id' => (string) Str::uuid(),
+            'consent' => '1',
+        ], $payload);
+
+        $startResponse = $this->postJson(route('public-positions.start', ['token' => $position->public_token]), $payload);
+
+        $startResponse
+            ->assertOk()
+            ->assertJson([
+                'status' => 'pending_confirmation',
+            ]);
+
+        $statusToken = (string) $startResponse->json('status_token');
+        $this->assertNotSame('', $statusToken);
+
+        $telegramUsername = strtolower(ltrim((string) $payload['telegram'], '@'));
+
+        $confirmationResult = app(TelegramAccountConfirmationService::class)->confirmByTokenAndUsername(
+            $statusToken,
+            [
+                'username' => $telegramUsername,
+                'user_id' => 770000 + random_int(1, 9999),
+                'chat_id' => 880000 + random_int(1, 9999),
+                'chat_type' => 'private',
+                'update_id' => 990000 + random_int(1, 9999),
+            ],
+        );
+
+        $this->assertContains($confirmationResult['status'], ['confirmed', 'already_confirmed']);
+
+        $statusResponse = $this->getJson(route('public-positions.confirmation-status', [
+            'token' => $position->public_token,
+            'statusToken' => $statusToken,
+        ]));
+
+        $statusResponse
+            ->assertOk()
+            ->assertJson([
+                'status' => 'confirmed',
+            ]);
+
+        $interviewId = InterviewTelegramConfirmation::query()
+            ->where('status_token', $statusToken)
+            ->value('interview_id');
+
+        $this->assertNotNull($interviewId);
+
+        return Interview::query()->findOrFail($interviewId);
     }
 }

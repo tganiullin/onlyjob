@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
 const PREP_SECONDS = 120;
 
@@ -31,6 +31,12 @@ const submitted = reactive({
 });
 const submitting = ref(false);
 const submitError = ref('');
+const awaitingTelegramConfirmation = ref(false);
+const confirmationStatusEndpoint = ref('');
+const telegramDeepLink = ref('');
+const pollIntervalMs = 3000;
+let confirmationPoller = null;
+let activeClientRequestId = createClientRequestId();
 
 const totalTimeLabel = computed(() => {
     const count = Number(props.questionsCount) || 0;
@@ -68,6 +74,78 @@ function setErrors(payload) {
     errors.consent = payload?.errors?.consent ?? [];
 }
 
+function createClientRequestId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+
+    const randomChunk = Math.random().toString(16).slice(2, 10);
+    return `fallback-${Date.now()}-${randomChunk}`;
+}
+
+function resetClientRequestId() {
+    activeClientRequestId = createClientRequestId();
+}
+
+function stopConfirmationPolling() {
+    if (confirmationPoller !== null) {
+        window.clearInterval(confirmationPoller);
+        confirmationPoller = null;
+    }
+}
+
+function startConfirmationPolling() {
+    stopConfirmationPolling();
+    confirmationPoller = window.setInterval(() => {
+        checkConfirmationStatus();
+    }, pollIntervalMs);
+}
+
+function resetPendingConfirmationState() {
+    stopConfirmationPolling();
+    awaitingTelegramConfirmation.value = false;
+    confirmationStatusEndpoint.value = '';
+    telegramDeepLink.value = '';
+    resetClientRequestId();
+}
+
+async function checkConfirmationStatus() {
+    if (!confirmationStatusEndpoint.value) {
+        return;
+    }
+
+    try {
+        const response = await fetch(confirmationStatusEndpoint.value, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+            },
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            stopConfirmationPolling();
+            submitError.value = data?.message ?? 'Не удалось проверить статус подтверждения. Попробуйте отправить форму снова.';
+            awaitingTelegramConfirmation.value = false;
+            resetClientRequestId();
+            return;
+        }
+
+        if (data?.telegram_deeplink) {
+            telegramDeepLink.value = data.telegram_deeplink;
+        }
+
+        if (data?.status === 'confirmed' && data?.redirect) {
+            stopConfirmationPolling();
+            window.location.href = data.redirect;
+        }
+    } catch {
+        // Keep polling: network hiccups should not reset the confirmation flow.
+    }
+}
+
 async function onSubmit() {
     submitError.value = '';
     setErrors({});
@@ -90,6 +168,7 @@ async function onSubmit() {
                 first_name: form.first_name.trim(),
                 last_name: form.last_name.trim(),
                 telegram: form.telegram.trim(),
+                client_request_id: activeClientRequestId,
                 consent: form.consent ? '1' : '',
             }),
         });
@@ -102,6 +181,16 @@ async function onSubmit() {
             return;
         }
 
+        if (data?.status === 'pending_confirmation') {
+            awaitingTelegramConfirmation.value = true;
+            confirmationStatusEndpoint.value = data?.status_endpoint ?? '';
+            telegramDeepLink.value = data?.telegram_deeplink ?? '';
+
+            await checkConfirmationStatus();
+            startConfirmationPolling();
+            return;
+        }
+
         if (data.redirect) {
             window.location.href = data.redirect;
         }
@@ -109,6 +198,10 @@ async function onSubmit() {
         submitting.value = false;
     }
 }
+
+onBeforeUnmount(() => {
+    stopConfirmationPolling();
+});
 </script>
 
 <template>
@@ -148,7 +241,7 @@ async function onSubmit() {
                         </h2>
                     </header>
 
-                    <form class="space-y-4" @submit.prevent="onSubmit" novalidate>
+                    <form v-if="!awaitingTelegramConfirmation" class="space-y-4" @submit.prevent="onSubmit" novalidate>
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label for="first_name" class="mb-1.5 block text-sm font-medium text-[#636985]">Имя</label>
@@ -180,16 +273,23 @@ async function onSubmit() {
                         </div>
 
                         <div>
-                            <label for="telegram" class="mb-1.5 block text-sm font-medium text-[#636985]">Telegram</label>
+                            <label for="telegram" class="mb-1.5 block text-sm font-medium text-[#636985]">Telegram аккаунт</label>
+                            <p class="mb-2 text-xs text-[#6a6f89]">
+                                На этот Telegram придет приглашение на собеседование и подтверждение аккаунта.
+                            </p>
                             <input
                                 id="telegram"
                                 v-model="form.telegram"
                                 type="text"
                                 autocomplete="username"
+                                placeholder="@username или username"
                                 class="input-field"
                                 :class="{ 'input-field--invalid': errors.telegram.length > 0 }"
                                 @blur="submitted.telegram = true"
                             >
+                            <p class="mt-1 text-xs text-[#8a90ab]">
+                                Пример: @john_doe. Можно вводить с символом @ или без него.
+                            </p>
                             <p v-for="msg in errors.telegram" :key="msg" class="text-xs text-red-600">{{ msg }}</p>
                         </div>
 
@@ -224,6 +324,39 @@ async function onSubmit() {
                             {{ submitting ? 'Отправка…' : 'Продолжить' }}
                         </button>
                     </form>
+
+                    <div v-else class="space-y-4 text-center">
+                        <h3 class="text-xl font-semibold text-[#252a45]">Подтвердите Telegram аккаунт</h3>
+                        <p class="text-sm text-[#555a73]">
+                            Откройте бота по кнопке ниже и нажмите Start. После подтверждения мы автоматически продолжим интервью.
+                        </p>
+
+                        <a
+                            v-if="telegramDeepLink"
+                            :href="telegramDeepLink"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn-brand inline-flex h-12 w-full items-center justify-center px-6 text-sm font-semibold text-white"
+                        >
+                            Открыть Telegram бота
+                        </a>
+
+                        <button
+                            type="button"
+                            class="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-xl border border-[#d6dbef] px-6 text-sm font-semibold text-[#2f365f] hover:bg-[#f4f6ff]"
+                            @click="checkConfirmationStatus"
+                        >
+                            Я уже подтвердил аккаунт
+                        </button>
+
+                        <button
+                            type="button"
+                            class="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-xl text-xs font-medium text-[#5b6282] hover:bg-[#f5f7ff]"
+                            @click="resetPendingConfirmationState"
+                        >
+                            Изменить данные
+                        </button>
+                    </div>
                 </section>
             </div>
         </main>
