@@ -9,6 +9,7 @@ const props = defineProps({
     questionsCount: { type: [Number, String], default: 0 },
     answerTimeSeconds: { type: Number, default: 120 },
     policyUrl: { type: String, default: '#' },
+    logoUrl: { type: String, default: '' },
 });
 
 const form = reactive({
@@ -208,7 +209,13 @@ onBeforeUnmount(() => {
     <div class="grid min-h-screen lg:grid-cols-[minmax(280px,0.9fr)_minmax(640px,1fr)]">
         <aside class="bg-[#eff3f8] px-10 py-10">
             <div class="mx-auto w-full max-w-[480px]">
-                <div class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">AYA</div>
+                <img
+                    v-if="logoUrl"
+                    :src="logoUrl"
+                    alt="Логотип компании"
+                    class="h-12 w-auto"
+                >
+                <div v-else class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">AYA</div>
 
                 <div class="mt-28">
                     <p class="text-3xl font-medium leading-tight text-[#2b2f45]">Здравствуйте 👋</p>

@@ -33,6 +33,18 @@ class PublicInterviewFlowTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_public_position_entry_contains_logo_url(): void
+    {
+        $position = Position::factory()->public()->create([
+            'public_token' => 'public-position-token-with-logo',
+        ]);
+
+        $response = $this->get(route('public-positions.show', ['token' => $position->public_token]));
+
+        $response->assertOk();
+        $response->assertSee('data-logo-url="'.asset('images/logo.svg').'"', false);
+    }
+
     public function test_start_creates_pending_confirmation_flow_without_creating_interview(): void
     {
         $position = Position::factory()->public()->create([
@@ -567,6 +579,7 @@ class PublicInterviewFlowTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-interview-completed="1"', false);
+        $response->assertSee('data-logo-url="'.asset('images/logo.svg').'"', false);
         $response->assertDontSee('public-interviews.finished');
     }
 
