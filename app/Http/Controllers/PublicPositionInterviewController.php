@@ -5,12 +5,18 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StartPublicInterviewRequest;
 use App\Models\Interview;
 use App\Models\Position;
+use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class PublicPositionInterviewController extends Controller
 {
+    public function __construct(
+        private readonly TelegramAccountConfirmationService $telegramAccountConfirmationService,
+    ) {}
+
     public function show(string $token): View
     {
         return view('public-interviews.entry', [
@@ -26,21 +32,92 @@ class PublicPositionInterviewController extends Controller
             abort(404);
         }
 
-        $interview = Interview::createPendingForCandidate(
+        $validated = $request->validated();
+
+        $confirmation = $this->telegramAccountConfirmationService->startOrReusePendingConfirmation(
             $position,
-            $request->validated(),
+            [
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'] ?? null,
+                'telegram' => $validated['telegram'],
+            ],
+            $this->telegramAccountConfirmationService->resolveSessionFingerprint(
+                (string) $request->ip(),
+                (string) $request->userAgent(),
+            ),
+            $validated['client_request_id'],
         );
 
-        $request->session()->put('public_interview_id', $interview->id);
+        $request->session()->forget('public_interview_id');
+        $request->session()->put('public_pending_confirmation_status_token', $confirmation->status_token);
+
+        $responsePayload = [
+            'status' => 'pending_confirmation',
+            'status_token' => $confirmation->status_token,
+            'status_endpoint' => route('public-positions.confirmation-status', [
+                'token' => $position->public_token,
+                'statusToken' => $confirmation->status_token,
+            ]),
+            'telegram_deeplink' => $this->telegramAccountConfirmationService->buildTelegramDeepLink($confirmation->status_token),
+            'message' => 'Подтвердите Telegram аккаунт через бота, чтобы продолжить интервью.',
+        ];
 
         if ($request->wantsJson()) {
+            return response()->json($responsePayload);
+        }
+
+        return redirect()
+            ->route('public-positions.show', ['token' => $position->public_token])
+            ->with('pending_confirmation', $responsePayload);
+    }
+
+    public function confirmationStatus(Request $request, string $token, string $statusToken): JsonResponse
+    {
+        $position = $this->findPublicPositionByToken($token);
+
+        $statusResult = $this->telegramAccountConfirmationService->resolvePendingConfirmationStatus(
+            $position,
+            $statusToken,
+            $this->telegramAccountConfirmationService->resolveSessionFingerprint(
+                (string) $request->ip(),
+                (string) $request->userAgent(),
+            ),
+        );
+
+        if ($statusResult['status'] === 'not_found') {
+            abort(404);
+        }
+
+        if ($statusResult['status'] === 'confirmed') {
+            $interview = Interview::query()->findOrFail($statusResult['interview_id']);
+
+            $request->session()->put('public_interview_id', $interview->id);
+            $request->session()->forget('public_pending_confirmation_status_token');
+
             return response()->json([
+                'status' => 'confirmed',
                 'redirect' => route('public-interviews.run', ['interview' => $interview]),
             ]);
         }
 
-        return redirect()->route('public-interviews.run', [
-            'interview' => $interview,
+        if ($statusResult['status'] === 'expired') {
+            return response()->json([
+                'status' => 'expired',
+                'message' => 'Время подтверждения истекло. Отправьте форму ещё раз.',
+            ], 409);
+        }
+
+        if ($statusResult['status'] === 'superseded') {
+            return response()->json([
+                'status' => 'superseded',
+                'message' => 'Форма была отправлена повторно с обновлёнными данными. Используйте последний запрос.',
+            ], 409);
+        }
+
+        return response()->json([
+            'status' => 'pending_confirmation',
+            'telegram_deeplink' => $this->telegramAccountConfirmationService->buildTelegramDeepLink($statusToken),
         ]);
     }
 

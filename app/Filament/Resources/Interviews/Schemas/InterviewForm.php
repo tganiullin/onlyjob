@@ -36,7 +36,9 @@ class InterviewForm
                             ->maxLength(255),
                         TextInput::make('email')
                             ->email()
-                            ->required()
+                            ->maxLength(255),
+                        TextInput::make('telegram')
+                            ->label('Telegram')
                             ->maxLength(255),
                         TextInput::make('phone')
                             ->tel()

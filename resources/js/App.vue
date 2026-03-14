@@ -17,6 +17,7 @@ const props = defineProps({
     lastName: { type: String, default: '' },
     positionTitle: { type: String, default: '' },
     answerTimeLabel: { type: String, default: '2 минуты' },
+    logoUrl: { type: String, default: '' },
 });
 
 const questions = computed(() => Array.isArray(props.questions) ? props.questions : []);
@@ -262,15 +263,25 @@ function handleSkipAnswer() {
 <template>
     <div class="relative min-h-screen overflow-hidden font-sans">
         <main class="min-h-screen">
-            <button
-                type="button"
-                class="absolute right-10 top-10 text-sm text-[#61678b] hover:text-[#464c72]"
-                @click="showHelpModal = true"
-            >
-                ⓘ Помощь
-            </button>
+            <header class="mx-auto flex w-full max-w-[1080px] items-center justify-between gap-4 px-6 pt-6 sm:px-10">
+                <img
+                    v-if="logoUrl"
+                    :src="logoUrl"
+                    alt="Логотип компании"
+                    class="h-10 w-auto sm:h-12"
+                >
+                <div v-else class="h-10 sm:h-12"></div>
 
-            <div class="mx-auto w-full max-w-[1080px] px-10 py-12">
+                <button
+                    type="button"
+                    class="text-sm text-[#61678b] transition-colors hover:text-[#464c72]"
+                    @click="showHelpModal = true"
+                >
+                    ⓘ Помощь
+                </button>
+            </header>
+
+            <div class="mx-auto w-full max-w-[1080px] px-6 pb-12 pt-8 sm:px-10">
                 <ScreenStart
                     v-show="currentScreen === 'start'"
                     :first-name="firstName"
