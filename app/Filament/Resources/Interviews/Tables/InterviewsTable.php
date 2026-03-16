@@ -32,7 +32,7 @@ class InterviewsTable
                             ->where('first_name', 'like', "%{$search}%")
                             ->orWhere('last_name', 'like', "%{$search}%");
                     }),
-                TextColumn::make('email')
+                TextColumn::make('telegram')
                     ->searchable(),
                 TextColumn::make('status')
                     ->badge()

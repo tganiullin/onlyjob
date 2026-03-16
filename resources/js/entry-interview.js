@@ -19,5 +19,6 @@ if (el) {
         lastName: el.dataset.lastName ?? '',
         positionTitle: el.dataset.positionTitle ?? '',
         answerTimeLabel: el.dataset.answerTimeLabel ?? '2 минуты',
+        logoUrl: el.dataset.logoUrl ?? '',
     }).mount(el);
 }

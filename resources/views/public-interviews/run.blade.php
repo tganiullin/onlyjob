@@ -20,6 +20,7 @@
     data-last-name="{{ $interview->last_name }}"
     data-position-title="{{ $position?->title ?? '' }}"
     data-answer-time-label="{{ $position?->answer_time_seconds?->getLabel() ?? '2 минуты' }}"
+    data-logo-url="{{ asset('images/logo.svg') }}"
     class="relative min-h-screen overflow-hidden"
 ></div>
 </body>

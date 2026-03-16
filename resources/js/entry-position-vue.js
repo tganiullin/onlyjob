@@ -10,6 +10,7 @@ if (el) {
         questionsCount: Number(el.dataset.questionsCount) || 0,
         answerTimeSeconds: Number(el.dataset.answerTimeSeconds) || 120,
         policyUrl: el.dataset.policyUrl ?? '#',
+        logoUrl: el.dataset.logoUrl ?? '',
     }).mount(el);
 }
 

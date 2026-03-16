@@ -56,6 +56,21 @@ class AppServiceProvider extends ServiceProvider
                 $this->resolveRouteSegmentKey($request, 'interview'),
             ));
         });
+
+        RateLimiter::for('public-interview-confirmation-status', function (Request $request): Limit {
+            return Limit::perMinute(30)->by(sprintf(
+                'public-interview-confirmation-status:%s:%s',
+                (string) $request->ip(),
+                $this->resolveRouteSegmentKey($request, 'statusToken'),
+            ));
+        });
+
+        RateLimiter::for('telegram-webhook', function (Request $request): Limit {
+            return Limit::perMinute(30)->by(sprintf(
+                'telegram-webhook:%s',
+                (string) $request->ip(),
+            ));
+        });
     }
 
     private function resolveRouteSegmentKey(Request $request, string $segment): string

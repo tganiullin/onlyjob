@@ -14,6 +14,9 @@ Route::prefix('public/positions')->name('public-positions.')->group(function ():
     Route::post('{token}/start', [PublicPositionInterviewController::class, 'start'])
         ->middleware('throttle:public-position-start')
         ->name('start');
+    Route::get('{token}/confirmations/{statusToken}/status', [PublicPositionInterviewController::class, 'confirmationStatus'])
+        ->middleware('throttle:public-interview-confirmation-status')
+        ->name('confirmation-status');
 });
 
 Route::prefix('public/interviews')->name('public-interviews.')->group(function (): void {

@@ -15,6 +15,7 @@
     data-questions-count="{{ $position->questions_count }}"
     data-answer-time-seconds="{{ $position->answer_time_seconds?->value ?? 120 }}"
     data-policy-url="{{ url('/policy') }}"
+    data-logo-url="{{ asset('images/logo.svg') }}"
 ></div>
 </body>
 </html>

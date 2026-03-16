@@ -153,6 +153,10 @@ class PublicInterviewRunController extends Controller
         if (! $interview->position instanceof Position) {
             abort(404);
         }
+
+        if ($interview->telegram_confirmed_at === null) {
+            abort(403);
+        }
     }
 
     private function resolveExpectedQuestion(Interview $interview): ?InterviewQuestion

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Interview extends Model
 {
@@ -21,6 +22,11 @@ class Interview extends Model
         'first_name',
         'last_name',
         'email',
+        'telegram',
+        'telegram_confirmed_at',
+        'telegram_user_id',
+        'telegram_chat_id',
+        'telegram_confirmed_username',
         'phone',
         'status',
         'score',
@@ -40,6 +46,9 @@ class Interview extends Model
             'status' => InterviewStatus::class,
             'score' => 'decimal:2',
             'candidate_feedback_rating' => 'integer',
+            'telegram_confirmed_at' => 'datetime',
+            'telegram_user_id' => 'integer',
+            'telegram_chat_id' => 'integer',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
@@ -61,6 +70,11 @@ class Interview extends Model
     public function interviewQuestions(): HasMany
     {
         return $this->hasMany(InterviewQuestion::class);
+    }
+
+    public function telegramConfirmation(): HasOne
+    {
+        return $this->hasOne(InterviewTelegramConfirmation::class);
     }
 
     public function snapshotPositionQuestions(): void
@@ -102,7 +116,7 @@ class Interview extends Model
     }
 
     /**
-     * @param  array{first_name: string, last_name: string, email: string, phone?: string|null}  $candidateData
+     * @param  array{first_name: string, last_name: string, telegram: string, email?: string|null, phone?: string|null}  $candidateData
      */
     public static function createPendingForCandidate(Position $position, array $candidateData): self
     {
@@ -110,7 +124,8 @@ class Interview extends Model
             'position_id' => $position->id,
             'first_name' => $candidateData['first_name'],
             'last_name' => $candidateData['last_name'],
-            'email' => $candidateData['email'],
+            'email' => $candidateData['email'] ?? null,
+            'telegram' => $candidateData['telegram'],
             'phone' => $candidateData['phone'] ?? null,
             'status' => InterviewStatus::Pending,
             'started_at' => now(),
