@@ -124,6 +124,7 @@ class PositionForm
                                 Repeater::make('questions')
                                     ->relationship()
                                     ->label('Questions')
+                                    ->defaultItems(0)
                                     ->columnSpanFull()
                                     ->schema([
                                         Textarea::make('text')
