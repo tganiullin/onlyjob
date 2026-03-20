@@ -11,7 +11,6 @@ use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
 use App\AI\Features\SpeechToText\FfmpegVoiceActivityDetector;
-use App\AI\Features\SpeechToText\NodeVoiceActivityDetector;
 use App\AI\Features\SpeechToText\VadSpeechTranscriber;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,15 +27,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(InterviewReviewer::class, AiInterviewReviewer::class);
         $this->app->bind(CompanyQuestionsGenerator::class, AiCompanyQuestionsGenerator::class);
         $this->app->bind(QuestionGenerator::class, AiQuestionGenerator::class);
-        $this->app->bind(VoiceActivityDetector::class, function () {
-            $engine = (string) config('ai.features.speech_to_text.vad.engine', 'node');
-
-            if ($engine === 'ffmpeg') {
-                return new FfmpegVoiceActivityDetector;
-            }
-
-            return new NodeVoiceActivityDetector;
-        });
+        $this->app->bind(VoiceActivityDetector::class, FfmpegVoiceActivityDetector::class);
         $this->app->bind(SpeechTranscriber::class, VadSpeechTranscriber::class);
     }
 
