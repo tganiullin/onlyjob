@@ -32,6 +32,11 @@ class PositionForm
      */
     private const LEVEL_STATE_PATHS = ['level', '../level', '../../level', '../../../level'];
 
+    /**
+     * @var list<string>
+     */
+    private const ANSWER_TIME_STATE_PATHS = ['answer_time_seconds', '../answer_time_seconds', '../../answer_time_seconds', '../../../answer_time_seconds'];
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -216,6 +221,7 @@ class PositionForm
                 'level' => $level,
                 'questions_count' => self::normalizeQuestionsCount($get('ai_questions_count')),
                 'focus' => self::normalizeFocus($get('ai_focus')),
+                'answer_time_seconds' => self::resolveAnswerTime($get),
                 'title' => $get('title'),
             ]);
         } catch (Throwable $exception) {
@@ -300,6 +306,32 @@ class PositionForm
     private static function normalizeQuestionsCount(mixed $value): int
     {
         return is_numeric($value) ? (int) $value : 5;
+    }
+
+    private static function resolveAnswerTime(Get $get): int
+    {
+        foreach (self::ANSWER_TIME_STATE_PATHS as $answerTimePath) {
+            $answerTime = self::normalizeAnswerTime($get($answerTimePath));
+
+            if ($answerTime !== null) {
+                return $answerTime;
+            }
+        }
+
+        return PositionAnswerTime::TwoMinutesThirtySeconds->value;
+    }
+
+    private static function normalizeAnswerTime(mixed $value): ?int
+    {
+        $normalized = match (true) {
+            $value instanceof PositionAnswerTime => $value->value,
+            $value instanceof BackedEnum => is_numeric($value->value) ? (int) $value->value : null,
+            is_int($value) => $value,
+            is_numeric($value) => (int) $value,
+            default => null,
+        };
+
+        return PositionAnswerTime::tryFrom((int) $normalized)?->value;
     }
 
     private static function normalizeFocus(mixed $value): string
