@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
 use App\Http\Requests\StorePublicInterviewAnswerRequest;
+use App\Http\Requests\StorePublicInterviewFeedbackRequest;
 use App\Http\Requests\TranscribePublicInterviewAudioRequest;
 use App\Models\Interview;
 use App\Models\InterviewQuestion;
@@ -49,6 +50,7 @@ class PublicInterviewRunController extends Controller
             'answerTimeSeconds' => (int) $answerTimeSeconds,
             'interviewCompleted' => $this->isInterviewTerminal($interview),
             'completionMessage' => self::COMPLETION_MESSAGE,
+            'candidateFeedbackRating' => $interview->candidate_feedback_rating,
         ]);
     }
 
@@ -113,6 +115,30 @@ class PublicInterviewRunController extends Controller
         return response()->json([
             'completed' => true,
             'message' => self::COMPLETION_MESSAGE,
+        ]);
+    }
+
+    public function feedback(
+        StorePublicInterviewFeedbackRequest $request,
+        Interview $interview,
+    ): JsonResponse {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        if (! $this->isInterviewTerminal($interview)) {
+            return response()->json([
+                'message' => 'Feedback is available only after completing the interview.',
+            ], 409);
+        }
+
+        $rating = (int) $request->validated('candidate_feedback_rating');
+
+        $interview->forceFill([
+            'candidate_feedback_rating' => $rating,
+        ])->save();
+
+        return response()->json([
+            'saved' => true,
+            'candidate_feedback_rating' => $rating,
         ]);
     }
 

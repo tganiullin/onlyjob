@@ -27,4 +27,7 @@ Route::prefix('public/interviews')->name('public-interviews.')->group(function (
     Route::post('{interview}/questions/{interviewQuestion}', [PublicInterviewRunController::class, 'answer'])
         ->middleware('throttle:public-interview-answer')
         ->name('questions.answer');
+    Route::post('{interview}/feedback', [PublicInterviewRunController::class, 'feedback'])
+        ->middleware('throttle:public-interview-answer')
+        ->name('feedback');
 });

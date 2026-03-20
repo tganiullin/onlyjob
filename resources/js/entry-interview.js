@@ -10,6 +10,7 @@ if (el) {
         questions: questionsArray,
         answerEndpointTemplate: el.dataset.answerEndpointTemplate ?? '',
         transcribeEndpoint: el.dataset.transcribeEndpoint ?? '',
+        feedbackEndpoint: el.dataset.feedbackEndpoint ?? '',
         answerTimeSeconds: Number.parseInt(el.dataset.answerTimeSeconds ?? '120', 10),
         interviewCompleted: el.dataset.interviewCompleted === '1',
         completionMessage:
@@ -20,5 +21,6 @@ if (el) {
         positionTitle: el.dataset.positionTitle ?? '',
         answerTimeLabel: el.dataset.answerTimeLabel ?? '2 минуты',
         logoUrl: el.dataset.logoUrl ?? '',
+        initialCandidateFeedbackRating: Number.parseInt(el.dataset.candidateFeedbackRating ?? '', 10) || null,
     }).mount(el);
 }
