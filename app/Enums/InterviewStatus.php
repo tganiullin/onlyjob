@@ -6,18 +6,28 @@ use Filament\Support\Contracts\HasLabel;
 
 enum InterviewStatus: string implements HasLabel
 {
-    case Pending = 'pending';
+    case PendingConfirmation = 'pending_confirmation';
+    case PendingInterview = 'pending_interview';
+    case InProgress = 'in_progress';
     case Completed = 'completed';
-    case Passed = 'passed';
-    case Failed = 'failed';
+    case QueuedForReview = 'queued_for_review';
+    case Reviewing = 'reviewing';
+    case ReviewedPassed = 'reviewed_passed';
+    case ReviewedFailed = 'reviewed_failed';
+    case ReviewFailed = 'review_failed';
 
     public function getLabel(): ?string
     {
         return match ($this) {
-            self::Pending => 'Pending',
-            self::Completed => 'Completed',
-            self::Passed => 'Passed',
-            self::Failed => 'Failed',
+            self::PendingConfirmation => 'Ожидает подтверждения Telegram',
+            self::PendingInterview => 'Готово к интервью',
+            self::InProgress => 'Интервью в процессе',
+            self::Completed => 'Ожидает AI-проверки',
+            self::QueuedForReview => 'В очереди на AI-проверку',
+            self::Reviewing => 'AI проверяет интервью',
+            self::ReviewedPassed => 'Проверено: порог пройден',
+            self::ReviewedFailed => 'Проверено: порог не пройден',
+            self::ReviewFailed => 'Ошибка AI-проверки',
         };
     }
 }

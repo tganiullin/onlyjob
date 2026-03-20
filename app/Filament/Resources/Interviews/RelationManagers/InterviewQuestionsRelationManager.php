@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Interviews\RelationManagers;
 
-use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -28,15 +27,21 @@ class InterviewQuestionsRelationManager extends RelationManager
                     ->columnSpanFull(),
                 Textarea::make('candidate_answer')
                     ->label('Candidate answer')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->rows(4)
                     ->columnSpanFull(),
                 TextInput::make('answer_score')
                     ->label('Answer score')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->numeric()
                     ->minValue(1)
                     ->maxValue(10),
                 Textarea::make('ai_comment')
                     ->label('AI comment')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->rows(3)
                     ->columnSpanFull(),
             ]);
@@ -63,9 +68,6 @@ class InterviewQuestionsRelationManager extends RelationManager
                     ->label('AI comment')
                     ->limit(70),
             ])
-            ->defaultSort('sort_order')
-            ->recordActions([
-                EditAction::make(),
-            ]);
+            ->defaultSort('sort_order');
     }
 }

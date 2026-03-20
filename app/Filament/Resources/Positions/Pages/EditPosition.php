@@ -15,10 +15,9 @@ class EditPosition extends EditRecord
     public function content(Schema $schema): Schema
     {
         return $schema
-            ->columns(12)
+            // ->columns(12)
             ->components([
                 $this->getFormContentComponent()->columnSpan(8),
-                $this->getRelationManagersContentComponent()->columnSpan(8),
             ]);
     }
 

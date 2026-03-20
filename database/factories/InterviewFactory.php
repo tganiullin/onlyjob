@@ -29,7 +29,7 @@ class InterviewFactory extends Factory
             'telegram_chat_id' => null,
             'telegram_confirmed_username' => null,
             'phone' => fake()->optional()->phoneNumber(),
-            'status' => InterviewStatus::Pending->value,
+            'status' => InterviewStatus::PendingConfirmation->value,
             'score' => null,
             'candidate_feedback_rating' => fake()->optional()->numberBetween(1, 5),
             'summary' => fake()->optional()->sentence(),

@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\AI\Features\CompanyQuestionsGeneration\AiCompanyQuestionsGenerator;
+use App\AI\Features\CompanyQuestionsGeneration\Contracts\CompanyQuestionsGenerator;
 use App\AI\Features\InterviewReview\AiInterviewReviewer;
 use App\AI\Features\InterviewReview\Contracts\InterviewReviewer;
 use App\AI\Features\QuestionGeneration\AiQuestionGenerator;
@@ -23,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(InterviewReviewer::class, AiInterviewReviewer::class);
+        $this->app->bind(CompanyQuestionsGenerator::class, AiCompanyQuestionsGenerator::class);
         $this->app->bind(QuestionGenerator::class, AiQuestionGenerator::class);
         $this->app->bind(VoiceActivityDetector::class, FfmpegVoiceActivityDetector::class);
         $this->app->bind(SpeechTranscriber::class, VadSpeechTranscriber::class);

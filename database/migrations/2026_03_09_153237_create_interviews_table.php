@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('email');
             $table->string('phone')->nullable();
             $table->enum('status', array_column(InterviewStatus::cases(), 'value'))
-                ->default(InterviewStatus::Pending->value);
+                ->default(InterviewStatus::PendingConfirmation->value);
             $table->decimal('score', 4, 2)->nullable();
             $table->unsignedTinyInteger('candidate_feedback_rating')->nullable();
             $table->text('summary')->nullable();

@@ -4,6 +4,7 @@ namespace App\AI\Features\InterviewReview;
 
 use App\AI\AiProviderResolver;
 use App\AI\Data\AiRequest;
+use App\AI\Features\Concerns\ResolvesAiFeatureConfig;
 use App\AI\Features\InterviewReview\Contracts\InterviewReviewer;
 use App\AI\Features\InterviewReview\Data\InterviewReviewResult;
 use App\Models\Interview;
@@ -11,6 +12,8 @@ use App\Models\InterviewQuestion;
 
 final class AiInterviewReviewer implements InterviewReviewer
 {
+    use ResolvesAiFeatureConfig;
+
     public function __construct(
         public AiProviderResolver $providerResolver,
     ) {}
@@ -26,9 +29,9 @@ final class AiInterviewReviewer implements InterviewReviewer
                 userPrompt: $this->buildUserPrompt($interview),
                 jsonSchema: $this->buildJsonSchema($interview),
                 schemaName: 'interview_review_result',
-                model: $this->resolveModel(),
-                temperature: $this->resolveTemperature(),
-                maxTokens: $this->resolveMaxTokens(),
+                model: $this->resolveFeatureModel('interview_review'),
+                temperature: $this->resolveFeatureTemperature('interview_review'),
+                maxTokens: $this->resolveFeatureMaxTokens('interview_review'),
             ));
 
         return InterviewReviewResult::fromArray($response->content);
@@ -151,39 +154,6 @@ PROMPT;
                 ],
             ],
         ];
-    }
-
-    private function resolveModel(): ?string
-    {
-        $model = config('ai.features.interview_review.model');
-
-        if (! is_string($model) || $model === '') {
-            return null;
-        }
-
-        return $model;
-    }
-
-    private function resolveTemperature(): ?float
-    {
-        $temperature = config('ai.features.interview_review.temperature');
-
-        if (! is_numeric($temperature)) {
-            return null;
-        }
-
-        return (float) $temperature;
-    }
-
-    private function resolveMaxTokens(): ?int
-    {
-        $maxTokens = config('ai.features.interview_review.max_tokens');
-
-        if (! is_numeric($maxTokens)) {
-            return null;
-        }
-
-        return max(1, (int) $maxTokens);
     }
 
     private function resolveOutputLanguage(): string

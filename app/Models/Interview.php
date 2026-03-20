@@ -127,8 +127,8 @@ class Interview extends Model
             'email' => $candidateData['email'] ?? null,
             'telegram' => $candidateData['telegram'],
             'phone' => $candidateData['phone'] ?? null,
-            'status' => InterviewStatus::Pending,
-            'started_at' => now(),
+            'status' => InterviewStatus::PendingConfirmation,
+            'started_at' => null,
             'completed_at' => null,
         ]);
     }

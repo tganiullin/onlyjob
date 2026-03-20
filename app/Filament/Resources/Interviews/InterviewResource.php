@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Interviews;
 use App\Filament\Resources\Interviews\Pages\CreateInterview;
 use App\Filament\Resources\Interviews\Pages\EditInterview;
 use App\Filament\Resources\Interviews\Pages\ListInterviews;
-use App\Filament\Resources\Interviews\RelationManagers\InterviewQuestionsRelationManager;
 use App\Filament\Resources\Interviews\Schemas\InterviewForm;
 use App\Filament\Resources\Interviews\Tables\InterviewsTable;
 use App\Models\Interview;
@@ -35,9 +34,7 @@ class InterviewResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            InterviewQuestionsRelationManager::class,
-        ];
+        return [];
     }
 
     public static function getPages(): array

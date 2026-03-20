@@ -7,6 +7,7 @@ use App\Enums\InterviewStatus;
 use App\Models\Interview;
 use App\Models\InterviewTelegramConfirmation;
 use App\Models\Position;
+use App\Models\PositionCompanyQuestion;
 use App\Models\Question;
 use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -309,7 +310,7 @@ class PublicInterviewFlowTest extends TestCase
             ]);
 
         $interview->refresh();
-        $this->assertSame(InterviewStatus::Pending, $interview->status);
+        $this->assertSame(InterviewStatus::InProgress, $interview->status);
         $this->assertNull($interview->completed_at);
         $this->assertDatabaseHas('interview_questions', [
             'id' => $firstInterviewQuestion->id,
@@ -393,7 +394,7 @@ class PublicInterviewFlowTest extends TestCase
         ]);
 
         $interview->refresh();
-        $this->assertSame(InterviewStatus::Pending, $interview->status);
+        $this->assertSame(InterviewStatus::PendingInterview, $interview->status);
         $this->assertNull($interview->completed_at);
     }
 
@@ -492,7 +493,7 @@ class PublicInterviewFlowTest extends TestCase
 
         $interview = Interview::factory()->create([
             'position_id' => $position->id,
-            'status' => InterviewStatus::Passed->value,
+            'status' => InterviewStatus::ReviewedPassed->value,
             'completed_at' => now(),
             'telegram_confirmed_at' => now(),
             'telegram_user_id' => 123456,
@@ -688,7 +689,7 @@ class PublicInterviewFlowTest extends TestCase
 
         $interview = Interview::factory()->create([
             'position_id' => $position->id,
-            'status' => InterviewStatus::Passed->value,
+            'status' => InterviewStatus::ReviewedPassed->value,
             'completed_at' => now(),
             'telegram_confirmed_at' => now(),
             'telegram_user_id' => 323456,
@@ -701,6 +702,70 @@ class PublicInterviewFlowTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-interview-completed="1"', false);
+    }
+
+    public function test_run_page_contains_company_questions_sorted_by_order(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'What is MVC?',
+        ]);
+
+        PositionCompanyQuestion::factory()->create([
+            'position_id' => $position->id,
+            'question' => 'Есть ли испытательный срок?',
+            'answer' => 'Да, испытательный срок составляет 3 месяца.',
+            'sort_order' => 2,
+        ]);
+
+        PositionCompanyQuestion::factory()->create([
+            'position_id' => $position->id,
+            'question' => 'Есть ли удаленный формат?',
+            'answer' => 'Да, гибридный формат: 2 дня офис, 3 дня удаленно.',
+            'sort_order' => 1,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 423456,
+            'telegram_chat_id' => 423456,
+            'telegram_confirmed_username' => 'company_questions_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->get(route('public-interviews.run', ['interview' => $interview]));
+
+        $response->assertOk();
+        $response->assertViewHas('companyQuestions', static function (array $companyQuestions): bool {
+            return count($companyQuestions) === 2
+                && $companyQuestions[0]['question'] === 'Есть ли удаленный формат?'
+                && $companyQuestions[1]['question'] === 'Есть ли испытательный срок?';
+        });
+    }
+
+    public function test_company_questions_sort_order_is_assigned_incrementally_when_missing(): void
+    {
+        $position = Position::factory()->create();
+
+        $firstQuestion = PositionCompanyQuestion::query()->create([
+            'position_id' => $position->id,
+            'question' => 'Первый вопрос',
+            'answer' => 'Первый ответ',
+        ]);
+
+        $secondQuestion = PositionCompanyQuestion::query()->create([
+            'position_id' => $position->id,
+            'question' => 'Второй вопрос',
+            'answer' => 'Второй ответ',
+        ]);
+
+        $this->assertSame(1, $firstQuestion->sort_order);
+        $this->assertSame(2, $secondQuestion->sort_order);
     }
 
     public function test_enabling_public_toggle_generates_position_token(): void

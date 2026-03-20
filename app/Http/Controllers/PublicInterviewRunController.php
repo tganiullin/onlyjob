@@ -10,6 +10,7 @@ use App\Http\Requests\TranscribePublicInterviewAudioRequest;
 use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\Position;
+use App\Models\PositionCompanyQuestion;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,13 @@ class PublicInterviewRunController extends Controller
             ->all();
 
         $answerTimeSeconds = $interview->position?->answer_time_seconds;
+        $companyQuestions = $interview->position?->companyQuestions()?->get(['id', 'question', 'answer'])
+            ->map(static fn (PositionCompanyQuestion $question): array => [
+                'id' => $question->id,
+                'question' => $question->question,
+                'answer' => $question->answer,
+            ])
+            ->all() ?? [];
 
         if ($answerTimeSeconds instanceof BackedEnum) {
             $answerTimeSeconds = $answerTimeSeconds->value;
@@ -47,6 +55,7 @@ class PublicInterviewRunController extends Controller
             'interview' => $interview,
             'position' => $interview->position,
             'questions' => $questions,
+            'companyQuestions' => $companyQuestions,
             'answerTimeSeconds' => (int) $answerTimeSeconds,
             'interviewCompleted' => $this->isInterviewTerminal($interview),
             'completionMessage' => self::COMPLETION_MESSAGE,
@@ -97,6 +106,8 @@ class PublicInterviewRunController extends Controller
         $expectedQuestion->forceFill([
             'candidate_answer' => $request->validated('candidate_answer'),
         ])->save();
+
+        $this->markInterviewAsInProgress($interview);
 
         $nextQuestion = $this->resolveExpectedQuestion($interview);
 
@@ -202,9 +213,28 @@ class PublicInterviewRunController extends Controller
     {
         return in_array($interview->status, [
             InterviewStatus::Completed,
-            InterviewStatus::Passed,
-            InterviewStatus::Failed,
+            InterviewStatus::QueuedForReview,
+            InterviewStatus::Reviewing,
+            InterviewStatus::ReviewedPassed,
+            InterviewStatus::ReviewedFailed,
+            InterviewStatus::ReviewFailed,
         ], true);
+    }
+
+    private function markInterviewAsInProgress(Interview $interview): void
+    {
+        if ($interview->status === InterviewStatus::InProgress) {
+            return;
+        }
+
+        if ($interview->status !== InterviewStatus::PendingInterview) {
+            return;
+        }
+
+        $interview->forceFill([
+            'status' => InterviewStatus::InProgress,
+            'started_at' => $interview->started_at ?? now(),
+        ])->save();
     }
 
     private function markInterviewAsCompleted(Interview $interview): void
@@ -213,12 +243,17 @@ class PublicInterviewRunController extends Controller
             return;
         }
 
-        if ($interview->status !== InterviewStatus::Pending && $interview->status !== InterviewStatus::Completed) {
+        if (! in_array($interview->status, [
+            InterviewStatus::PendingInterview,
+            InterviewStatus::InProgress,
+            InterviewStatus::Completed,
+        ], true)) {
             return;
         }
 
         $interview->forceFill([
             'status' => InterviewStatus::Completed,
+            'started_at' => $interview->started_at ?? now(),
             'completed_at' => $interview->completed_at ?? now(),
         ])->save();
     }

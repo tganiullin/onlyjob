@@ -75,7 +75,11 @@ final class InterviewReviewService
 
     private function syncFinalStatus(Interview $interview): void
     {
-        if ($interview->status !== InterviewStatus::Completed || $interview->score === null) {
+        if (! in_array($interview->status, [
+            InterviewStatus::Completed,
+            InterviewStatus::QueuedForReview,
+            InterviewStatus::Reviewing,
+        ], true) || $interview->score === null) {
             return;
         }
 
@@ -86,8 +90,8 @@ final class InterviewReviewService
         }
 
         $nextStatus = (float) $interview->score >= (float) $minimumScore
-            ? InterviewStatus::Passed
-            : InterviewStatus::Failed;
+            ? InterviewStatus::ReviewedPassed
+            : InterviewStatus::ReviewedFailed;
 
         $interview->forceFill([
             'status' => $nextStatus,

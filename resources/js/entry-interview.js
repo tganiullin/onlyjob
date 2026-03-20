@@ -4,10 +4,13 @@ import App from './App.vue';
 const el = document.getElementById('public-interview-run');
 if (el) {
     const questions = JSON.parse(el.dataset.questions ?? '[]');
+    const companyQuestions = JSON.parse(el.dataset.companyQuestions ?? '[]');
     const questionsArray = Array.isArray(questions) ? questions : [];
+    const companyQuestionsArray = Array.isArray(companyQuestions) ? companyQuestions : [];
 
     createApp(App, {
         questions: questionsArray,
+        companyQuestions: companyQuestionsArray,
         answerEndpointTemplate: el.dataset.answerEndpointTemplate ?? '',
         transcribeEndpoint: el.dataset.transcribeEndpoint ?? '',
         feedbackEndpoint: el.dataset.feedbackEndpoint ?? '',

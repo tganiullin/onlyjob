@@ -72,8 +72,15 @@ class InterviewsTable
                     ->label('Queue AI review')
                     ->color('primary')
                     ->requiresConfirmation()
-                    ->visible(static fn (Interview $record): bool => $record->status === InterviewStatus::Completed)
+                    ->visible(static fn (Interview $record): bool => in_array($record->status, [
+                        InterviewStatus::Completed,
+                        InterviewStatus::ReviewFailed,
+                    ], true))
                     ->action(static function (Interview $record): void {
+                        $record->forceFill([
+                            'status' => InterviewStatus::QueuedForReview,
+                        ])->save();
+
                         CheckInterviewJob::dispatch($record->id);
                     })
                     ->successNotificationTitle('Interview has been queued for AI review.'),
