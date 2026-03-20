@@ -8,6 +8,7 @@ const props = defineProps({
     showInstructionsMessage: { type: Boolean, default: false },
     interviewStarted: { type: Boolean, default: false },
     questions: { type: Array, default: () => [] },
+    companyQuestions: { type: Array, default: () => [] },
     currentQuestionIndex: { type: Number, default: 0 },
     interviewCompleted: { type: Boolean, default: false },
     submittedAnswers: { type: Object, default: () => ({}) },
@@ -82,6 +83,8 @@ watch(() => props.interviewCompleted, (completed) => {
 
 const continueLoading = ref(false);
 const hoveredFeedbackStar = ref(null);
+const showAllCompanyQuestions = ref(false);
+const selectedCompanyQuestionId = ref(null);
 
 function handleContinueClick() {
     continueLoading.value = true;
@@ -97,6 +100,36 @@ function isFeedbackStarActive(starValue) {
     }
 
     return Number.isInteger(props.feedbackRating) && props.feedbackRating >= starValue;
+}
+
+const normalizedCompanyQuestions = computed(() => {
+    if (!Array.isArray(props.companyQuestions)) {
+        return [];
+    }
+
+    return props.companyQuestions.filter((item) => {
+        return item && typeof item.question === 'string' && typeof item.answer === 'string';
+    });
+});
+
+const visibleCompanyQuestions = computed(() => {
+    if (showAllCompanyQuestions.value) {
+        return normalizedCompanyQuestions.value;
+    }
+
+    return normalizedCompanyQuestions.value.slice(0, 3);
+});
+
+const selectedCompanyQuestion = computed(() => {
+    if (!Number.isInteger(selectedCompanyQuestionId.value)) {
+        return null;
+    }
+
+    return normalizedCompanyQuestions.value.find((item) => Number(item.id) === selectedCompanyQuestionId.value) ?? null;
+});
+
+function handleCompanyQuestionSelect(question) {
+    selectedCompanyQuestionId.value = Number(question.id);
 }
 
 const visibleQuestions = () => {
@@ -388,6 +421,65 @@ onUnmounted(() => {
                         </p>
                     </div>
                     <span v-if="completionMessageTime" class="text-xs text-[#b4b8cc]">{{ completionMessageTime }}</span>
+                </div>
+            </div>
+
+            <div
+                v-if="interviewStarted && interviewCompleted && normalizedCompanyQuestions.length > 0"
+                class="space-y-4 pt-2"
+            >
+                <div class="flex items-start gap-3">
+                    <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                        style="background-color: var(--color-brand);"
+                        aria-hidden="true"
+                    >
+                        L
+                    </div>
+                    <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                        <p>А пока, возможно, есть вопросы о компании.</p>
+                        <p class="mt-1">Выберите вопрос из списка:</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap justify-end gap-3">
+                    <button
+                        v-for="question in visibleCompanyQuestions"
+                        :key="question.id"
+                        type="button"
+                        class="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-[var(--color-brand)] bg-white px-6 text-sm font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)] hover:text-white"
+                        @click="handleCompanyQuestionSelect(question)"
+                    >
+                        {{ question.question }}
+                    </button>
+                    <button
+                        v-if="normalizedCompanyQuestions.length > 3 && !showAllCompanyQuestions"
+                        type="button"
+                        class="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-[var(--color-brand)] bg-white px-6 text-sm font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)] hover:text-white"
+                        @click="showAllCompanyQuestions = true"
+                    >
+                        Показать все вопросы
+                    </button>
+                </div>
+
+                <div v-if="selectedCompanyQuestion" class="space-y-4">
+                    <div class="flex items-start justify-end gap-3">
+                        <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tr-md bg-[var(--color-brand)] px-6 py-5 text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
+                            {{ selectedCompanyQuestion.question }}
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                            style="background-color: var(--color-brand);"
+                            aria-hidden="true"
+                        >
+                            L
+                        </div>
+                        <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                            {{ selectedCompanyQuestion.answer }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

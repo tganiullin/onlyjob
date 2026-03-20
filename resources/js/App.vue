@@ -8,6 +8,7 @@ import { useInterviewApi } from './composables/useInterviewApi.js';
 
 const props = defineProps({
     questions: { type: Array, default: () => [] },
+    companyQuestions: { type: Array, default: () => [] },
     answerEndpointTemplate: { type: String, default: '' },
     transcribeEndpoint: { type: String, default: '' },
     feedbackEndpoint: { type: String, default: '' },
@@ -333,6 +334,7 @@ async function handleFeedbackSelect(rating) {
                     :show-instructions-message="showInstructionsInChat"
                     :interview-started="currentScreen === 'interview'"
                     :questions="questions"
+                    :company-questions="companyQuestions"
                     :current-question-index="currentIndex"
                     :interview-completed="completed"
                     :submitted-answers="submittedAnswers"

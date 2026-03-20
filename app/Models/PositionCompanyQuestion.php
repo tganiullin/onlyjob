@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Question extends Model
+class PositionCompanyQuestion extends Model
 {
-    /** @use HasFactory<\Database\Factories\QuestionFactory> */
+    /** @use HasFactory<\Database\Factories\PositionCompanyQuestionFactory> */
     use AssignsSortOrderOnCreate, HasFactory;
 
     /**
@@ -17,9 +17,9 @@ class Question extends Model
      */
     protected $fillable = [
         'position_id',
-        'text',
+        'question',
+        'answer',
         'sort_order',
-        'evaluation_instructions',
     ];
 
     /**

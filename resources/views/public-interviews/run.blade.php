@@ -11,6 +11,7 @@
 <div
     id="public-interview-run"
     data-questions='@json($questions, JSON_UNESCAPED_UNICODE)'
+    data-company-questions='@json($companyQuestions, JSON_UNESCAPED_UNICODE)'
     data-answer-endpoint-template="{{ route('public-interviews.questions.answer', ['interview' => $interview, 'interviewQuestion' => '__QUESTION_ID__']) }}"
     data-transcribe-endpoint="{{ route('public-interviews.transcribe', ['interview' => $interview]) }}"
     data-feedback-endpoint="{{ route('public-interviews.feedback', ['interview' => $interview]) }}"

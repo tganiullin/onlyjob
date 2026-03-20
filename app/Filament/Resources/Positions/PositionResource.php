@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Positions;
 use App\Filament\Resources\Positions\Pages\CreatePosition;
 use App\Filament\Resources\Positions\Pages\EditPosition;
 use App\Filament\Resources\Positions\Pages\ListPositions;
+use App\Filament\Resources\Positions\RelationManagers\CompanyQuestionsRelationManager;
 use App\Filament\Resources\Positions\RelationManagers\QuestionsRelationManager;
 use App\Filament\Resources\Positions\Schemas\PositionForm;
 use App\Filament\Resources\Positions\Tables\PositionsTable;
@@ -39,6 +40,7 @@ class PositionResource extends Resource
     {
         return [
             QuestionsRelationManager::class,
+            CompanyQuestionsRelationManager::class,
         ];
     }
 

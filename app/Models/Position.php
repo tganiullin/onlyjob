@@ -60,6 +60,13 @@ class Position extends Model
         return $this->hasMany(Interview::class);
     }
 
+    public function companyQuestions(): HasMany
+    {
+        return $this->hasMany(PositionCompanyQuestion::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
     public function getPublicUrlAttribute(): ?string
     {
         if (! $this->is_public || blank($this->public_token)) {

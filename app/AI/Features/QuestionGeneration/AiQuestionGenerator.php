@@ -4,12 +4,15 @@ namespace App\AI\Features\QuestionGeneration;
 
 use App\AI\AiProviderResolver;
 use App\AI\Data\AiRequest;
+use App\AI\Features\Concerns\ResolvesAiFeatureConfig;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionLevel;
 use InvalidArgumentException;
 
 final class AiQuestionGenerator implements QuestionGenerator
 {
+    use ResolvesAiFeatureConfig;
+
     public function __construct(
         public AiProviderResolver $providerResolver,
     ) {}
@@ -33,9 +36,9 @@ final class AiQuestionGenerator implements QuestionGenerator
                 ),
                 jsonSchema: $this->buildJsonSchema($questionsCount),
                 schemaName: 'position_questions',
-                model: $this->resolveModel(),
-                temperature: $this->resolveTemperature(),
-                maxTokens: $this->resolveMaxTokens(),
+                model: $this->resolveFeatureModel('question_generation'),
+                temperature: $this->resolveFeatureTemperature('question_generation'),
+                maxTokens: $this->resolveFeatureMaxTokens('question_generation'),
             ));
 
         return $this->normalizeQuestions($response->content, $questionsCount);
@@ -261,38 +264,5 @@ PROMPT;
                 $outputLanguage,
             ),
         };
-    }
-
-    private function resolveModel(): ?string
-    {
-        $model = config('ai.features.question_generation.model');
-
-        if (! is_string($model) || $model === '') {
-            return null;
-        }
-
-        return $model;
-    }
-
-    private function resolveTemperature(): ?float
-    {
-        $temperature = config('ai.features.question_generation.temperature');
-
-        if (! is_numeric($temperature)) {
-            return null;
-        }
-
-        return (float) $temperature;
-    }
-
-    private function resolveMaxTokens(): ?int
-    {
-        $maxTokens = config('ai.features.question_generation.max_tokens');
-
-        if (! is_numeric($maxTokens)) {
-            return null;
-        }
-
-        return max(1, (int) $maxTokens);
     }
 }

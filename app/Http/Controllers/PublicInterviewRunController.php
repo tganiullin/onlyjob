@@ -10,6 +10,7 @@ use App\Http\Requests\TranscribePublicInterviewAudioRequest;
 use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\Position;
+use App\Models\PositionCompanyQuestion;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,13 @@ class PublicInterviewRunController extends Controller
             ->all();
 
         $answerTimeSeconds = $interview->position?->answer_time_seconds;
+        $companyQuestions = $interview->position?->companyQuestions()?->get(['id', 'question', 'answer'])
+            ->map(static fn (PositionCompanyQuestion $question): array => [
+                'id' => $question->id,
+                'question' => $question->question,
+                'answer' => $question->answer,
+            ])
+            ->all() ?? [];
 
         if ($answerTimeSeconds instanceof BackedEnum) {
             $answerTimeSeconds = $answerTimeSeconds->value;
@@ -47,6 +55,7 @@ class PublicInterviewRunController extends Controller
             'interview' => $interview,
             'position' => $interview->position,
             'questions' => $questions,
+            'companyQuestions' => $companyQuestions,
             'answerTimeSeconds' => (int) $answerTimeSeconds,
             'interviewCompleted' => $this->isInterviewTerminal($interview),
             'completionMessage' => self::COMPLETION_MESSAGE,

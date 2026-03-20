@@ -7,6 +7,7 @@ use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
 use App\Filament\Resources\Positions\Pages\CreatePosition;
 use App\Models\Position;
+use App\Models\PositionCompanyQuestion;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
@@ -61,12 +62,23 @@ class CreatePositionAiQuestionsTest extends TestCase
                     'answer_time_seconds' => PositionAnswerTime::TwoMinutesThirtySeconds->value,
                     'level' => PositionLevel::Senior->value,
                     'questions' => $generatedQuestions,
+                    'companyQuestions' => [
+                        [
+                            'question' => 'Как часто индексация зарплаты?',
+                            'answer' => 'Обычно раз в год по результатам performance review.',
+                        ],
+                        [
+                            'question' => 'Есть ли удаленный формат?',
+                            'answer' => 'Да, доступен гибридный формат.',
+                        ],
+                    ],
                 ]);
 
             $component
                 ->assertSchemaStateSet(function (array $state): array {
                     $this->assertSame('Backend Engineer', $state['title']);
                     $this->assertCount(2, $state['questions']);
+                    $this->assertCount(2, $state['companyQuestions']);
 
                     return [];
                 })
@@ -87,6 +99,15 @@ class CreatePositionAiQuestionsTest extends TestCase
                 'position_id' => $position->id,
                 'text' => 'How do you handle schema changes without downtime?',
             ]);
+            $this->assertDatabaseHas('position_company_questions', [
+                'position_id' => $position->id,
+                'question' => 'Как часто индексация зарплаты?',
+            ]);
+            $this->assertDatabaseHas('position_company_questions', [
+                'position_id' => $position->id,
+                'question' => 'Есть ли удаленный формат?',
+            ]);
+            $this->assertSame(2, PositionCompanyQuestion::query()->where('position_id', $position->id)->count());
         } finally {
             $undoRepeaterFake();
         }
