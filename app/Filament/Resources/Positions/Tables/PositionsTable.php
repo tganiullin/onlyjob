@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Positions\Tables;
 
 use App\Models\Position;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -12,6 +13,7 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
@@ -64,27 +66,29 @@ class PositionsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                Action::make('copyPublicLink')
-                    ->label('Copy public link')
-                    ->icon('heroicon-m-link')
-                    ->visible($hasPublicLink)
-                    ->schema([
-                        TextInput::make('public_link')
-                            ->label('Public link')
-                            ->readOnly()
-                            ->dehydrated(false)
-                            ->copyable(copyMessage: 'Public link copied', copyMessageDuration: 1500),
-                    ])
-                    ->fillForm(static fn (?Position $record): array => [
-                        'public_link' => $record?->public_url,
-                    ])
-                    ->modalSubmitAction(false)
-                    ->action(static function (): void {}),
-                EditAction::make(),
-                DeleteAction::make()
-                    ->label('Archive'),
-                RestoreAction::make(),
-            ])
+                ActionGroup::make([
+                    Action::make('copyPublicLink')
+                        ->label('Copy public link')
+                        ->icon('heroicon-m-link')
+                        ->visible($hasPublicLink)
+                        ->schema([
+                            TextInput::make('public_link')
+                                ->label('Public link')
+                                ->readOnly()
+                                ->dehydrated(false)
+                                ->copyable(copyMessage: 'Public link copied', copyMessageDuration: 1500),
+                        ])
+                        ->fillForm(static fn (?Position $record): array => [
+                            'public_link' => $record?->public_url,
+                        ])
+                        ->modalSubmitAction(false)
+                        ->action(static function (): void {}),
+                    EditAction::make(),
+                    DeleteAction::make()
+                        ->label('Archive'),
+                    RestoreAction::make(),
+                ]),
+            ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()

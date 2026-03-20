@@ -6,10 +6,12 @@ use App\Enums\InterviewStatus;
 use App\Jobs\CheckInterviewJob;
 use App\Models\Interview;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -68,24 +70,26 @@ class InterviewsTable
                     ->falseLabel('Not completed'),
             ])
             ->recordActions([
-                Action::make('queueAiReview')
-                    ->label('Queue AI review')
-                    ->color('primary')
-                    ->requiresConfirmation()
-                    ->visible(static fn (Interview $record): bool => in_array($record->status, [
-                        InterviewStatus::Completed,
-                        InterviewStatus::ReviewFailed,
-                    ], true))
-                    ->action(static function (Interview $record): void {
-                        $record->forceFill([
-                            'status' => InterviewStatus::QueuedForReview,
-                        ])->save();
+                ActionGroup::make([
+                    Action::make('queueAiReview')
+                        ->label('Queue AI review')
+                        ->color('primary')
+                        ->requiresConfirmation()
+                        ->visible(static fn (Interview $record): bool => in_array($record->status, [
+                            InterviewStatus::Completed,
+                            InterviewStatus::ReviewFailed,
+                        ], true))
+                        ->action(static function (Interview $record): void {
+                            $record->forceFill([
+                                'status' => InterviewStatus::QueuedForReview,
+                            ])->save();
 
-                        CheckInterviewJob::dispatch($record->id);
-                    })
-                    ->successNotificationTitle('Interview has been queued for AI review.'),
-                EditAction::make(),
-            ])
+                            CheckInterviewJob::dispatch($record->id);
+                        })
+                        ->successNotificationTitle('Interview has been queued for AI review.'),
+                    EditAction::make(),
+                ]),
+            ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
