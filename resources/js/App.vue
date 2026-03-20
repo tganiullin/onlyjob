@@ -10,6 +10,7 @@ const props = defineProps({
     questions: { type: Array, default: () => [] },
     answerEndpointTemplate: { type: String, default: '' },
     transcribeEndpoint: { type: String, default: '' },
+    feedbackEndpoint: { type: String, default: '' },
     answerTimeSeconds: { type: Number, default: 120 },
     interviewCompleted: { type: Boolean, default: false },
     completionMessage: { type: String, default: 'Спасибо! Вы успешно завершили первый этап интервью.' },
@@ -18,6 +19,7 @@ const props = defineProps({
     positionTitle: { type: String, default: '' },
     answerTimeLabel: { type: String, default: '2 минуты' },
     logoUrl: { type: String, default: '' },
+    initialCandidateFeedbackRating: { type: Number, default: null },
 });
 
 const questions = computed(() => Array.isArray(props.questions) ? props.questions : []);
@@ -53,10 +55,21 @@ const submitting = ref(false);
 const skipSubmitting = ref(false);
 const answerStatus = ref(completed.value ? props.completionMessage : '');
 const answerStatusError = ref(false);
+const feedbackRating = ref(
+    Number.isInteger(props.initialCandidateFeedbackRating) &&
+    props.initialCandidateFeedbackRating >= 1 &&
+    props.initialCandidateFeedbackRating <= 5
+        ? props.initialCandidateFeedbackRating
+        : null,
+);
+const feedbackSubmitting = ref(false);
+const feedbackStatus = ref('');
+const feedbackStatusError = ref(false);
 
 const api = useInterviewApi({
     transcribeEndpoint: props.transcribeEndpoint,
     answerEndpointTemplate: props.answerEndpointTemplate,
+    feedbackEndpoint: props.feedbackEndpoint,
 });
 
 const { remainingSeconds, formatTimer, start: startTimer, stop: stopTimer } = useQuestionTimer(
@@ -258,6 +271,27 @@ function handleSkipAnswer() {
     skipSubmitting.value = true;
     submitAnswer('Не знаю ответ');
 }
+
+async function handleFeedbackSelect(rating) {
+    if (feedbackSubmitting.value) {
+        return;
+    }
+
+    feedbackSubmitting.value = true;
+    feedbackStatus.value = 'Сохраняем вашу оценку...';
+    feedbackStatusError.value = false;
+
+    try {
+        await api.submitFeedback(rating);
+        feedbackRating.value = rating;
+        feedbackStatus.value = 'Спасибо! Ваша оценка сохранена.';
+    } catch (err) {
+        feedbackStatus.value = err instanceof Error ? err.message : 'Не удалось сохранить оценку.';
+        feedbackStatusError.value = true;
+    } finally {
+        feedbackSubmitting.value = false;
+    }
+}
 </script>
 
 <template>
@@ -318,12 +352,17 @@ function handleSkipAnswer() {
                     :answer-status="answerStatus"
                     :answer-status-error="answerStatusError"
                     :recording-supported="recordingSupported"
+                    :feedback-rating="feedbackRating"
+                    :feedback-submitting="feedbackSubmitting"
+                    :feedback-status="feedbackStatus"
+                    :feedback-status-error="feedbackStatusError"
                     @request-microphone="handleRequestMicrophone"
                     @toggle-phrase-record="handleTogglePhraseRecord"
                     @continue="handleChatContinue"
                     @start="handleInstructionsStart"
                     @record-toggle="handleRecordToggle"
                     @skip-answer="handleSkipAnswer"
+                    @feedback-select="handleFeedbackSelect"
                 />
             </div>
         </main>

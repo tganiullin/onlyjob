@@ -26,8 +26,20 @@ const props = defineProps({
     answerStatus: { type: String, default: '' },
     answerStatusError: { type: Boolean, default: false },
     recordingSupported: { type: Boolean, default: true },
+    feedbackRating: { type: Number, default: null },
+    feedbackSubmitting: { type: Boolean, default: false },
+    feedbackStatus: { type: String, default: '' },
+    feedbackStatusError: { type: Boolean, default: false },
 });
-const emit = defineEmits(['request-microphone', 'toggle-phrase-record', 'continue', 'start', 'record-toggle', 'skip-answer']);
+const emit = defineEmits([
+    'request-microphone',
+    'toggle-phrase-record',
+    'continue',
+    'start',
+    'record-toggle',
+    'skip-answer',
+    'feedback-select',
+]);
 
 function formatMessageTime() {
     const d = new Date();
@@ -69,12 +81,22 @@ watch(() => props.interviewCompleted, (completed) => {
 }, { immediate: true });
 
 const continueLoading = ref(false);
+const hoveredFeedbackStar = ref(null);
+
 function handleContinueClick() {
     continueLoading.value = true;
     emit('continue');
     setTimeout(() => {
         continueLoading.value = false;
     }, 400);
+}
+
+function isFeedbackStarActive(starValue) {
+    if (Number.isInteger(hoveredFeedbackStar.value)) {
+        return hoveredFeedbackStar.value >= starValue;
+    }
+
+    return Number.isInteger(props.feedbackRating) && props.feedbackRating >= starValue;
 }
 
 const visibleQuestions = () => {
@@ -330,6 +352,34 @@ onUnmounted(() => {
                 <div class="min-w-0 flex-1 max-w-[620px] flex flex-col gap-1">
                     <div class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-5 text-base text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
                         <p>{{ completionMessage }}</p>
+                        <div class="mt-5 rounded-2xl border border-[#eceffd] bg-[#f8f9ff] p-4">
+                            <p class="text-sm font-semibold text-[#2f344d]">Оцените, пожалуйста, как прошло интервью</p>
+                            <div class="mt-3 flex items-center gap-2">
+                                <button
+                                    v-for="star in 5"
+                                    :key="star"
+                                    type="button"
+                                    :disabled="feedbackSubmitting"
+                                    :aria-label="`Поставить ${star} звезд`"
+                                    class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent transition-colors hover:text-amber-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                    :class="isFeedbackStarActive(star) ? 'text-amber-400' : 'text-[#d3d7ea]'"
+                                    @mouseenter="hoveredFeedbackStar = star"
+                                    @mouseleave="hoveredFeedbackStar = null"
+                                    @click="emit('feedback-select', star)"
+                                >
+                                    <svg class="h-7 w-7 fill-current" viewBox="0 0 20 20" aria-hidden="true">
+                                        <path d="M10 1.667l2.573 5.213 5.754.836-4.164 4.059.983 5.731L10 14.803l-5.146 2.703.983-5.731L1.673 7.716l5.754-.836L10 1.667z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <p
+                                v-if="feedbackStatus"
+                                class="mt-3 text-sm"
+                                :class="feedbackStatusError ? 'text-red-600' : 'text-[#4f556f]'"
+                            >
+                                {{ feedbackStatus }}
+                            </p>
+                        </div>
                         <p class="mt-4">
                             Как только ваши ответы будут проанализированы, вы сможете получить приглашение на следующий этап интервью.
                         </p>

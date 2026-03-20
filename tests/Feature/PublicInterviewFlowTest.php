@@ -550,6 +550,100 @@ class PublicInterviewFlowTest extends TestCase
         $this->assertFalse($fakeSpeechTranscriber->wasCalled);
     }
 
+    public function test_feedback_endpoint_saves_candidate_rating_after_interview_completion(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'What is MVC?',
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'candidate_feedback_rating' => null,
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 523456,
+            'telegram_chat_id' => 523456,
+            'telegram_confirmed_username' => 'feedback_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.feedback', ['interview' => $interview]), [
+                'candidate_feedback_rating' => 5,
+            ]);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'saved' => true,
+                'candidate_feedback_rating' => 5,
+            ]);
+
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'candidate_feedback_rating' => 5,
+        ]);
+    }
+
+    public function test_feedback_endpoint_validates_rating_range(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'What is MVC?',
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'candidate_feedback_rating' => null,
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 623456,
+            'telegram_chat_id' => 623456,
+            'telegram_confirmed_username' => 'feedback_validation_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.feedback', ['interview' => $interview]), [
+                'candidate_feedback_rating' => 6,
+            ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['candidate_feedback_rating']);
+    }
+
+    public function test_feedback_endpoint_is_forbidden_without_active_public_interview_session(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'What is MVC?',
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 723456,
+            'telegram_chat_id' => 723456,
+            'telegram_confirmed_username' => 'feedback_forbidden_user',
+        ]);
+
+        $this->withSession(['public_interview_id' => null])
+            ->postJson(route('public-interviews.feedback', ['interview' => $interview]), [
+                'candidate_feedback_rating' => 4,
+            ])
+            ->assertForbidden();
+    }
+
     public function test_completed_interview_is_rendered_on_same_run_page_without_finished_redirect(): void
     {
         $position = Position::factory()->public()->create();
@@ -636,16 +730,19 @@ class PublicInterviewFlowTest extends TestCase
         $confirmationStatusRoute = Route::getRoutes()->getByName('public-positions.confirmation-status');
         $transcribeRoute = Route::getRoutes()->getByName('public-interviews.transcribe');
         $answerRoute = Route::getRoutes()->getByName('public-interviews.questions.answer');
+        $feedbackRoute = Route::getRoutes()->getByName('public-interviews.feedback');
 
         $this->assertNotNull($startRoute);
         $this->assertNotNull($confirmationStatusRoute);
         $this->assertNotNull($transcribeRoute);
         $this->assertNotNull($answerRoute);
+        $this->assertNotNull($feedbackRoute);
 
         $this->assertContains('throttle:public-position-start', $startRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-confirmation-status', $confirmationStatusRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-transcribe', $transcribeRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $answerRoute->gatherMiddleware());
+        $this->assertContains('throttle:public-interview-answer', $feedbackRoute->gatherMiddleware());
     }
 
     /**

@@ -5,7 +5,7 @@ function getCsrfToken() {
 }
 
 export function useInterviewApi(config) {
-    const { transcribeEndpoint, answerEndpointTemplate } = config;
+    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint } = config;
 
     const transcribe = async (audioBlob) => {
         const csrf = getCsrfToken();
@@ -62,5 +62,32 @@ export function useInterviewApi(config) {
         return payload;
     };
 
-    return { transcribe, submitAnswer };
+    const submitFeedback = async (candidateFeedbackRating) => {
+        const csrf = getCsrfToken();
+        if (!csrf) throw new Error('Не найден CSRF токен. Обновите страницу.');
+        if (!feedbackEndpoint) throw new Error('Маршрут сохранения оценки не настроен.');
+
+        const res = await fetch(feedbackEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ candidate_feedback_rating: candidateFeedbackRating }),
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const msg =
+                payload?.errors?.candidate_feedback_rating?.[0] ??
+                payload?.message ??
+                'Не удалось сохранить оценку интервью.';
+            throw new Error(msg);
+        }
+
+        return payload;
+    };
+
+    return { transcribe, submitAnswer, submitFeedback };
 }

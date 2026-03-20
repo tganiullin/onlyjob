@@ -13,9 +13,11 @@
     data-questions='@json($questions, JSON_UNESCAPED_UNICODE)'
     data-answer-endpoint-template="{{ route('public-interviews.questions.answer', ['interview' => $interview, 'interviewQuestion' => '__QUESTION_ID__']) }}"
     data-transcribe-endpoint="{{ route('public-interviews.transcribe', ['interview' => $interview]) }}"
+    data-feedback-endpoint="{{ route('public-interviews.feedback', ['interview' => $interview]) }}"
     data-answer-time-seconds="{{ $answerTimeSeconds }}"
     data-interview-completed="{{ $interviewCompleted ? '1' : '0' }}"
     data-completion-message="{{ $completionMessage }}"
+    data-candidate-feedback-rating="{{ $candidateFeedbackRating ?? '' }}"
     data-first-name="{{ $interview->first_name }}"
     data-last-name="{{ $interview->last_name }}"
     data-position-title="{{ $position?->title ?? '' }}"
