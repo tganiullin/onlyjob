@@ -6,7 +6,9 @@ use App\AI\AiProviderResolver;
 use App\AI\Data\AiRequest;
 use App\AI\Features\Concerns\ResolvesAiFeatureConfig;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
+use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use BackedEnum;
 use InvalidArgumentException;
 
 final class AiQuestionGenerator implements QuestionGenerator
@@ -23,16 +25,18 @@ final class AiQuestionGenerator implements QuestionGenerator
         $positionLevel = $this->resolvePositionLevel($context);
         $questionsCount = $this->resolveQuestionsCount($context);
         $focus = $this->resolveFocus($context);
+        $answerTime = $this->resolveAnswerTime($context);
 
         $response = $this->providerResolver
             ->resolveForFeature('question_generation')
             ->generateStructured(new AiRequest(
-                systemPrompt: $this->buildSystemPrompt($positionLevel, $focus),
+                systemPrompt: $this->buildSystemPrompt($positionLevel, $focus, $answerTime),
                 userPrompt: $this->buildUserPrompt(
                     description: $description,
                     positionLevel: $positionLevel,
                     questionsCount: $questionsCount,
                     focus: $focus,
+                    answerTime: $answerTime,
                 ),
                 jsonSchema: $this->buildJsonSchema($questionsCount),
                 schemaName: 'position_questions',
@@ -97,10 +101,38 @@ final class AiQuestionGenerator implements QuestionGenerator
         };
     }
 
-    private function buildSystemPrompt(PositionLevel $positionLevel, string $focus): string
+    private function resolveAnswerTime(array $context): PositionAnswerTime
+    {
+        $answerTime = $context['answer_time_seconds'] ?? null;
+
+        if ($answerTime instanceof PositionAnswerTime) {
+            return $answerTime;
+        }
+
+        if ($answerTime instanceof BackedEnum) {
+            $answerTime = $answerTime->value;
+        }
+
+        if (is_string($answerTime)) {
+            $answerTime = trim($answerTime);
+        }
+
+        if (is_int($answerTime) || is_numeric($answerTime)) {
+            $resolved = PositionAnswerTime::tryFrom((int) $answerTime);
+
+            if ($resolved instanceof PositionAnswerTime) {
+                return $resolved;
+            }
+        }
+
+        return PositionAnswerTime::TwoMinutesThirtySeconds;
+    }
+
+    private function buildSystemPrompt(PositionLevel $positionLevel, string $focus, PositionAnswerTime $answerTime): string
     {
         $focusGuideline = $this->resolveFocusGuideline($focus);
         $levelGuideline = $this->resolveLevelGuideline($positionLevel);
+        $answerTimeGuideline = $this->resolveAnswerTimeGuideline($answerTime);
         $outputLanguage = $this->resolveOutputLanguageRule();
 
         return <<<PROMPT
@@ -109,14 +141,23 @@ You are a senior technical interviewer creating structured screening interview q
 Task:
 - Generate practical interview questions from the position description.
 - Adjust depth and complexity to the target level: {$positionLevel->getLabel()}.
-- Keep each question concise and specific.
+- Keep each question concise, specific, and answerable within the allowed time.
 - Provide one short evaluation instruction for each question.
+- Prefer scenario and problem-solving questions ("How would you...", "What would happen if...", "How would you debug...") over biography questions.
+- Do not rely on "tell me about your past experience" phrasing as the primary question style.
+- Ask for concrete technical reasoning and verifiable steps, not generic opinions.
+- Each question must check one core competency at a time.
+- Avoid broad or abstract wording that can be answered vaguely.
+- Avoid stacked multi-part questions.
 
 Level alignment:
 {$levelGuideline}
 
 Focus:
 {$focusGuideline}
+
+Time per answer:
+{$answerTimeGuideline}
 
 Language:
 {$outputLanguage}
@@ -132,6 +173,7 @@ PROMPT;
         PositionLevel $positionLevel,
         int $questionsCount,
         string $focus,
+        PositionAnswerTime $answerTime,
     ): string {
         $payload = [
             'description' => $description,
@@ -139,6 +181,8 @@ PROMPT;
             'level_label' => $positionLevel->getLabel(),
             'questions_count' => $questionsCount,
             'focus' => $focus,
+            'answer_time_seconds' => $answerTime->value,
+            'answer_time_label' => $answerTime->getLabel(),
         ];
 
         $encodedPayload = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
@@ -233,9 +277,9 @@ PROMPT;
     private function resolveFocusGuideline(string $focus): string
     {
         return match ($focus) {
-            'soft_skills' => 'Prioritize communication, ownership, teamwork, and stakeholder collaboration questions with role context.',
-            'mixed' => 'Balance technical depth with collaboration and communication competency checks.',
-            default => 'Prioritize technical hard-skill questions: architecture, debugging, implementation, and trade-offs.',
+            'soft_skills' => 'Prioritize communication, ownership, teamwork, and stakeholder collaboration questions with role context. Keep them situational ("How would you handle..."), not generic biography prompts.',
+            'mixed' => 'Balance technical depth with collaboration checks: at least 70% technical scenario/problem-solving questions and up to 30% situational soft-skill questions.',
+            default => 'Prioritize technical hard-skill questions: architecture, debugging, implementation, and trade-offs. Keep all questions technical and scenario-driven.',
         };
     }
 
@@ -246,6 +290,27 @@ PROMPT;
             PositionLevel::Middle => '- Focus on practical implementation, debugging, maintainability, and reasonable trade-offs.',
             PositionLevel::Senior => '- Focus on architecture decisions, scalability, reliability, and nuanced trade-offs.',
             PositionLevel::Lead => '- Focus on system strategy, cross-team impact, technical leadership, and decision quality.',
+        };
+    }
+
+    private function resolveAnswerTimeGuideline(PositionAnswerTime $answerTime): string
+    {
+        return match (true) {
+            $answerTime->value <= PositionAnswerTime::OneMinuteThirtySeconds->value => sprintf(
+                '- Candidate has %s (%d seconds) per answer. Ask narrow, high-signal questions that can be answered with one concrete example.',
+                $answerTime->getLabel(),
+                $answerTime->value,
+            ),
+            $answerTime->value <= PositionAnswerTime::TwoMinutesThirtySeconds->value => sprintf(
+                '- Candidate has %s (%d seconds) per answer. Ask specific scenario-based questions that require concise explanation of actions and outcomes.',
+                $answerTime->getLabel(),
+                $answerTime->value,
+            ),
+            default => sprintf(
+                '- Candidate has %s (%d seconds) per answer. Questions may include context, but still require concrete and verifiable response details.',
+                $answerTime->getLabel(),
+                $answerTime->value,
+            ),
         };
     }
 

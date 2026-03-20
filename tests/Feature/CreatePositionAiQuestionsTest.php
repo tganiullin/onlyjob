@@ -51,6 +51,7 @@ class CreatePositionAiQuestionsTest extends TestCase
                 'level' => PositionLevel::Senior->value,
                 'questions_count' => 2,
                 'focus' => 'hard_skills',
+                'answer_time_seconds' => PositionAnswerTime::TwoMinutesThirtySeconds->value,
             ]);
 
             $this->assertSame(1, $provider->callCount);
@@ -91,6 +92,7 @@ class CreatePositionAiQuestionsTest extends TestCase
             $this->assertNotNull($position);
             $this->assertSame('Backend Engineer', $position->title);
             $this->assertStringContainsString('"level": "senior"', $provider->requests[0]->userPrompt);
+            $this->assertStringContainsString('"answer_time_seconds": 150', $provider->requests[0]->userPrompt);
             $this->assertDatabaseHas('questions', [
                 'position_id' => $position->id,
                 'text' => 'How would you design a fault-tolerant queue pipeline?',
