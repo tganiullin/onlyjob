@@ -310,7 +310,7 @@ class PublicInterviewFlowTest extends TestCase
             ]);
 
         $interview->refresh();
-        $this->assertSame(InterviewStatus::Pending, $interview->status);
+        $this->assertSame(InterviewStatus::InProgress, $interview->status);
         $this->assertNull($interview->completed_at);
         $this->assertDatabaseHas('interview_questions', [
             'id' => $firstInterviewQuestion->id,
@@ -394,7 +394,7 @@ class PublicInterviewFlowTest extends TestCase
         ]);
 
         $interview->refresh();
-        $this->assertSame(InterviewStatus::Pending, $interview->status);
+        $this->assertSame(InterviewStatus::PendingInterview, $interview->status);
         $this->assertNull($interview->completed_at);
     }
 
@@ -493,7 +493,7 @@ class PublicInterviewFlowTest extends TestCase
 
         $interview = Interview::factory()->create([
             'position_id' => $position->id,
-            'status' => InterviewStatus::Passed->value,
+            'status' => InterviewStatus::ReviewedPassed->value,
             'completed_at' => now(),
             'telegram_confirmed_at' => now(),
             'telegram_user_id' => 123456,
@@ -689,7 +689,7 @@ class PublicInterviewFlowTest extends TestCase
 
         $interview = Interview::factory()->create([
             'position_id' => $position->id,
-            'status' => InterviewStatus::Passed->value,
+            'status' => InterviewStatus::ReviewedPassed->value,
             'completed_at' => now(),
             'telegram_confirmed_at' => now(),
             'telegram_user_id' => 323456,

@@ -107,6 +107,8 @@ class PublicInterviewRunController extends Controller
             'candidate_answer' => $request->validated('candidate_answer'),
         ])->save();
 
+        $this->markInterviewAsInProgress($interview);
+
         $nextQuestion = $this->resolveExpectedQuestion($interview);
 
         if ($nextQuestion instanceof InterviewQuestion) {
@@ -211,9 +213,28 @@ class PublicInterviewRunController extends Controller
     {
         return in_array($interview->status, [
             InterviewStatus::Completed,
-            InterviewStatus::Passed,
-            InterviewStatus::Failed,
+            InterviewStatus::QueuedForReview,
+            InterviewStatus::Reviewing,
+            InterviewStatus::ReviewedPassed,
+            InterviewStatus::ReviewedFailed,
+            InterviewStatus::ReviewFailed,
         ], true);
+    }
+
+    private function markInterviewAsInProgress(Interview $interview): void
+    {
+        if ($interview->status === InterviewStatus::InProgress) {
+            return;
+        }
+
+        if ($interview->status !== InterviewStatus::PendingInterview) {
+            return;
+        }
+
+        $interview->forceFill([
+            'status' => InterviewStatus::InProgress,
+            'started_at' => $interview->started_at ?? now(),
+        ])->save();
     }
 
     private function markInterviewAsCompleted(Interview $interview): void
@@ -222,12 +243,17 @@ class PublicInterviewRunController extends Controller
             return;
         }
 
-        if ($interview->status !== InterviewStatus::Pending && $interview->status !== InterviewStatus::Completed) {
+        if (! in_array($interview->status, [
+            InterviewStatus::PendingInterview,
+            InterviewStatus::InProgress,
+            InterviewStatus::Completed,
+        ], true)) {
             return;
         }
 
         $interview->forceFill([
             'status' => InterviewStatus::Completed,
+            'started_at' => $interview->started_at ?? now(),
             'completed_at' => $interview->completed_at ?? now(),
         ])->save();
     }

@@ -20,7 +20,7 @@ class CheckInterviewJobTest extends TestCase
     {
         $interview = $this->createInterviewWithAnswers(
             minimumScore: 7,
-            status: InterviewStatus::Pending,
+            status: InterviewStatus::PendingInterview,
         );
 
         $provider = new FakeAiProvider([
@@ -34,7 +34,7 @@ class CheckInterviewJobTest extends TestCase
         (new CheckInterviewJob($interview->id))->handle(app(InterviewReviewService::class));
 
         $this->assertSame(0, $provider->callCount);
-        $this->assertSame(InterviewStatus::Pending, $interview->fresh()->status);
+        $this->assertSame(InterviewStatus::PendingInterview, $interview->fresh()->status);
         $this->assertNull($interview->fresh()->summary);
     }
 
@@ -80,7 +80,7 @@ class CheckInterviewJobTest extends TestCase
 
         $this->assertDatabaseHas('interviews', [
             'id' => $interview->id,
-            'status' => InterviewStatus::Passed->value,
+            'status' => InterviewStatus::ReviewedPassed->value,
             'summary' => 'Strong practical backend fundamentals with minor gaps in edge-case handling.',
             'score' => '7.60',
         ]);
@@ -132,7 +132,7 @@ class CheckInterviewJobTest extends TestCase
 
         $this->assertDatabaseHas('interviews', [
             'id' => $interview->id,
-            'status' => InterviewStatus::Failed->value,
+            'status' => InterviewStatus::ReviewedFailed->value,
             'score' => '6.50',
         ]);
     }

@@ -126,7 +126,7 @@ class TelegramAccountConfirmationServiceTest extends TestCase
 
         $interview = Interview::query()->firstOrFail();
         $this->assertSame($position->id, $interview->position_id);
-        $this->assertSame(InterviewStatus::Pending, $interview->status);
+        $this->assertSame(InterviewStatus::PendingInterview, $interview->status);
         $this->assertSame('john_doe', $interview->telegram_confirmed_username);
         $this->assertNotNull($interview->telegram_confirmed_at);
         $this->assertSame(1, $interview->interviewQuestions()->count());

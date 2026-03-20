@@ -212,8 +212,8 @@ class TelegramAccountConfirmationService
                 'telegram_chat_id' => $telegramChatId,
                 'telegram_confirmed_username' => $normalizedTelegramUsername,
                 'phone' => null,
-                'status' => InterviewStatus::Pending,
-                'started_at' => $now,
+                'status' => InterviewStatus::PendingInterview,
+                'started_at' => null,
                 'completed_at' => null,
             ]);
 

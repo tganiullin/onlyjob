@@ -145,12 +145,12 @@ class InterviewTest extends TestCase
     public function test_interview_status_is_cast_to_enum(): void
     {
         $pendingInterview = Interview::factory()->create([
-            'status' => InterviewStatus::Pending->value,
+            'status' => InterviewStatus::PendingInterview->value,
         ]);
 
         $completedInterview = Interview::factory()->completed()->create();
 
-        $this->assertSame(InterviewStatus::Pending, $pendingInterview->fresh()->status);
+        $this->assertSame(InterviewStatus::PendingInterview, $pendingInterview->fresh()->status);
         $this->assertSame(InterviewStatus::Completed, $completedInterview->fresh()->status);
     }
 
@@ -169,7 +169,7 @@ class InterviewTest extends TestCase
 
         $pendingBackendInterview = Interview::factory()->create([
             'position_id' => $backendPosition->id,
-            'status' => InterviewStatus::Pending->value,
+            'status' => InterviewStatus::PendingInterview->value,
         ]);
 
         $completedBackendInterview = Interview::factory()->create([
@@ -180,7 +180,7 @@ class InterviewTest extends TestCase
 
         $passedFrontendInterview = Interview::factory()->create([
             'position_id' => $frontendPosition->id,
-            'status' => InterviewStatus::Passed->value,
+            'status' => InterviewStatus::ReviewedPassed->value,
             'completed_at' => now(),
         ]);
 
@@ -188,7 +188,7 @@ class InterviewTest extends TestCase
             ->assertTableFilterVisible('status')
             ->assertTableFilterVisible('position_id')
             ->assertTableFilterVisible('completed_at')
-            ->filterTable('status', InterviewStatus::Pending->value)
+            ->filterTable('status', InterviewStatus::PendingInterview->value)
             ->assertCanSeeTableRecords([$pendingBackendInterview])
             ->assertCanNotSeeTableRecords([$completedBackendInterview, $passedFrontendInterview])
             ->removeTableFilter('status')

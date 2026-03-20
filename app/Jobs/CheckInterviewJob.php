@@ -8,6 +8,7 @@ use App\Services\InterviewReviewService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 class CheckInterviewJob implements ShouldBeUnique, ShouldQueue
 {
@@ -34,7 +35,11 @@ class CheckInterviewJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if ($interview->status !== InterviewStatus::Completed) {
+        if (! in_array($interview->status, [
+            InterviewStatus::Completed,
+            InterviewStatus::QueuedForReview,
+            InterviewStatus::Reviewing,
+        ], true)) {
             return;
         }
 
@@ -42,6 +47,18 @@ class CheckInterviewJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $interviewReviewService->reviewAndApply($interview);
+        $interview->forceFill([
+            'status' => InterviewStatus::Reviewing,
+        ])->saveQuietly();
+
+        try {
+            $interviewReviewService->reviewAndApply($interview);
+        } catch (Throwable $exception) {
+            $interview->forceFill([
+                'status' => InterviewStatus::ReviewFailed,
+            ])->saveQuietly();
+
+            throw $exception;
+        }
     }
 }

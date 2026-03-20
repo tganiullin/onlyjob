@@ -50,7 +50,7 @@ class InterviewForm
                     ->schema([
                         Select::make('status')
                             ->options(InterviewStatus::class)
-                            ->default(InterviewStatus::Pending->value)
+                            ->default(InterviewStatus::PendingConfirmation->value)
                             ->required(),
                         ToggleButtons::make('candidate_feedback_rating')
                             ->label('Candidate feedback rating')
