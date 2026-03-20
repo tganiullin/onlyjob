@@ -84,7 +84,7 @@ watch(() => props.interviewCompleted, (completed) => {
 const continueLoading = ref(false);
 const hoveredFeedbackStar = ref(null);
 const showAllCompanyQuestions = ref(false);
-const selectedCompanyQuestionId = ref(null);
+const selectedCompanyQuestionMessages = ref([]);
 
 function handleContinueClick() {
     continueLoading.value = true;
@@ -120,16 +120,15 @@ const visibleCompanyQuestions = computed(() => {
     return normalizedCompanyQuestions.value.slice(0, 3);
 });
 
-const selectedCompanyQuestion = computed(() => {
-    if (!Number.isInteger(selectedCompanyQuestionId.value)) {
-        return null;
-    }
-
-    return normalizedCompanyQuestions.value.find((item) => Number(item.id) === selectedCompanyQuestionId.value) ?? null;
-});
-
 function handleCompanyQuestionSelect(question) {
-    selectedCompanyQuestionId.value = Number(question.id);
+    selectedCompanyQuestionMessages.value = [
+        ...selectedCompanyQuestionMessages.value,
+        {
+            key: `${question.id}-${Date.now()}-${selectedCompanyQuestionMessages.value.length}`,
+            question: question.question,
+            answer: question.answer,
+        },
+    ];
 }
 
 const visibleQuestions = () => {
@@ -462,10 +461,10 @@ onUnmounted(() => {
                     </button>
                 </div>
 
-                <div v-if="selectedCompanyQuestion" class="space-y-4">
+                <div v-for="message in selectedCompanyQuestionMessages" :key="message.key" class="space-y-4">
                     <div class="flex items-start justify-end gap-3">
                         <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tr-md bg-[var(--color-brand)] px-6 py-5 text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
-                            {{ selectedCompanyQuestion.question }}
+                            {{ message.question }}
                         </div>
                     </div>
                     <div class="flex items-start gap-3">
@@ -477,7 +476,7 @@ onUnmounted(() => {
                             L
                         </div>
                         <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
-                            {{ selectedCompanyQuestion.answer }}
+                            {{ message.answer }}
                         </div>
                     </div>
                 </div>
