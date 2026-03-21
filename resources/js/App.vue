@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, watch, onUnmounted } from 'vue';
 import ScreenStart from './components/interview/ScreenStart.vue';
 import ScreenChat from './components/interview/ScreenChat.vue';
 import { useQuestionTimer } from './composables/useQuestionTimer.js';
@@ -89,6 +89,57 @@ const isRecordingPhrase = computed(() => recordingMode.value === 'phrase');
 const isRecordingAnswer = computed(() => recordingMode.value === 'answer');
 
 const interviewFinished = computed(() => completed.value || currentIndex.value >= questions.value.length);
+const showRecordHint = ref(false);
+const highlightRecordButton = ref(false);
+
+const answeredByRecordingQuestionIds = new Set();
+let recordHintTimeoutId = null;
+
+function clearRecordHintTimer() {
+    if (recordHintTimeoutId !== null) {
+        window.clearTimeout(recordHintTimeoutId);
+        recordHintTimeoutId = null;
+    }
+}
+
+function resetRecordHint() {
+    clearRecordHintTimer();
+    showRecordHint.value = false;
+    highlightRecordButton.value = false;
+}
+
+function resolveCurrentQuestionId() {
+    return questions.value[currentIndex.value]?.id ?? null;
+}
+
+function shouldShowRecordAttention() {
+    const questionId = resolveCurrentQuestionId();
+    return (
+        currentScreen.value === 'interview' &&
+        !completed.value &&
+        questionId !== null &&
+        !isRecordingAnswer.value &&
+        !transcribing.value &&
+        !submitting.value &&
+        !skipSubmitting.value &&
+        !answeredByRecordingQuestionIds.has(String(questionId))
+    );
+}
+
+function scheduleRecordHint() {
+    resetRecordHint();
+    if (!shouldShowRecordAttention()) {
+        return;
+    }
+
+    highlightRecordButton.value = true;
+
+    recordHintTimeoutId = window.setTimeout(() => {
+        if (shouldShowRecordAttention()) {
+            showRecordHint.value = true;
+        }
+    }, 8000);
+}
 
 function handleStartFlow() {
     currentScreen.value = 'chat';
@@ -121,7 +172,7 @@ function handleTogglePhraseRecord() {
             microphoneStatus.value = 'Идет запись фразы...';
             microphoneStatusError.value = false;
         },
-        onStop: async (blob, mode) => {
+        onStop: async (blob, _mode, _vadResult) => {
             transcribing.value = true;
             microphoneStatus.value = 'Распознаю тестовую фразу...';
             try {
@@ -236,10 +287,15 @@ function handleRecordToggle() {
 
     startRecording('answer', {
         onStart: () => {
+            const currentQuestionId = resolveCurrentQuestionId();
+            if (currentQuestionId !== null) {
+                answeredByRecordingQuestionIds.add(String(currentQuestionId));
+            }
+            resetRecordHint();
             answerStatus.value = 'Идет запись ответа...';
             answerStatusError.value = false;
         },
-        onStop: async (blob) => {
+        onStop: async (blob, _mode, _vadResult) => {
             transcribing.value = true;
             answerStatus.value = 'Распознаю ответ...';
             answerStatusError.value = false;
@@ -264,6 +320,7 @@ function handleRecordToggle() {
         onError: (msg) => {
             answerStatus.value = msg;
             answerStatusError.value = true;
+            scheduleRecordHint();
         },
     });
 }
@@ -293,6 +350,26 @@ async function handleFeedbackSelect(rating) {
         feedbackSubmitting.value = false;
     }
 }
+
+watch(
+    () => [
+        currentScreen.value,
+        completed.value,
+        currentIndex.value,
+        isRecordingAnswer.value,
+        transcribing.value,
+        submitting.value,
+        skipSubmitting.value,
+    ],
+    () => {
+        scheduleRecordHint();
+    },
+    { immediate: true },
+);
+
+onUnmounted(() => {
+    clearRecordHintTimer();
+});
 </script>
 
 <template>
@@ -353,6 +430,8 @@ async function handleFeedbackSelect(rating) {
                     :is-recording-answer="isRecordingAnswer"
                     :answer-status="answerStatus"
                     :answer-status-error="answerStatusError"
+                    :show-record-hint="showRecordHint"
+                    :highlight-record-button="highlightRecordButton"
                     :recording-supported="recordingSupported"
                     :feedback-rating="feedbackRating"
                     :feedback-submitting="feedbackSubmitting"

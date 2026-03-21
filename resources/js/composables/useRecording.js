@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue';
+import { useFrontendVad } from './useFrontendVad.js';
 
 const MIME_CANDIDATES = [
     'audio/webm;codecs=opus',
@@ -33,6 +34,7 @@ export function useRecording() {
     const mediaRecorderSupported = typeof window.MediaRecorder !== 'undefined';
     const canRequestMicrophone = typeof navigator.mediaDevices?.getUserMedia === 'function';
     const recordingSupported = computed(() => mediaRecorderSupported && canRequestMicrophone);
+    const { detectSpeech } = useFrontendVad();
 
     const hasValidStream = () => stream.value instanceof MediaStream;
 
@@ -98,7 +100,7 @@ export function useRecording() {
             onError?.('Ошибка записи.');
         };
 
-        recorder.value.onstop = () => {
+        recorder.value.onstop = async () => {
             const stoppedMode = recordingMode.value;
             recordingMode.value = null;
 
@@ -112,7 +114,15 @@ export function useRecording() {
                 stopAllTracks();
                 return;
             }
-            onStop?.(blob, stoppedMode);
+
+            const vadResult = await detectSpeech(blob);
+            if (!vadResult.hasSpeech) {
+                onError?.('Речь не обнаружена. Повторите запись и говорите чуть громче.');
+                stopAllTracks();
+                return;
+            }
+
+            onStop?.(blob, stoppedMode, vadResult);
             stopAllTracks();
         };
 

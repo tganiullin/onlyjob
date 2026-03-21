@@ -41,6 +41,7 @@ return [
             'model' => env('AI_SPEECH_TO_TEXT_MODEL', 'gpt-4o-mini-transcribe'),
             'temperature' => (float) env('AI_SPEECH_TO_TEXT_TEMPERATURE', 0),
             'vad' => [
+                'runtime' => env('AI_SPEECH_TO_TEXT_VAD_RUNTIME', 'frontend'),
                 'enabled' => (bool) env('AI_SPEECH_TO_TEXT_VAD_ENABLED', true),
                 'noise_threshold_db' => (float) env('AI_SPEECH_TO_TEXT_VAD_NOISE_THRESHOLD_DB', -45),
                 'min_silence_seconds' => (float) env('AI_SPEECH_TO_TEXT_VAD_MIN_SILENCE_SECONDS', 0.2),

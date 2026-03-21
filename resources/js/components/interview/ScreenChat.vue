@@ -26,6 +26,8 @@ const props = defineProps({
     isRecordingAnswer: { type: Boolean, default: false },
     answerStatus: { type: String, default: '' },
     answerStatusError: { type: Boolean, default: false },
+    showRecordHint: { type: Boolean, default: false },
+    highlightRecordButton: { type: Boolean, default: false },
     recordingSupported: { type: Boolean, default: true },
     feedbackRating: { type: Number, default: null },
     feedbackSubmitting: { type: Boolean, default: false },
@@ -513,6 +515,9 @@ onUnmounted(() => {
                             isRecordingAnswer
                                 ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
                                 : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
+                            highlightRecordButton && !isRecordingAnswer
+                                ? 'ring-4 ring-[var(--color-brand)]/25 ring-offset-2 ring-offset-white motion-safe:animate-pulse'
+                                : '',
                         ]"
                         @click="$emit('record-toggle')"
                     >
@@ -527,10 +532,23 @@ onUnmounted(() => {
                     </button>
                 </div>
                 <p
+                    v-if="showRecordHint && !isRecordingAnswer && !transcribing && !submitting"
+                    class="text-center text-sm text-[#4f556f]"
+                >
+                    Нажмите «Записать ответ», чтобы отправить ответ на текущий вопрос.
+                </p>
+                <p
                     v-show="!recordingSupported"
                     class="text-center text-xs text-amber-700"
                 >
                     Запись звука не поддерживается в этом браузере. Пожалуйста, используйте Chrome или Safari.
+                </p>
+                <p
+                    v-if="answerStatus"
+                    class="text-center text-sm"
+                    :class="answerStatusError ? 'text-red-600' : 'text-[#4f556f]'"
+                >
+                    {{ answerStatus }}
                 </p>
             </div>
         </div>
