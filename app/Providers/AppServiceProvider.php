@@ -11,8 +11,9 @@ use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
 use App\AI\Features\SpeechToText\FfmpegVoiceActivityDetector;
-use App\AI\Features\SpeechToText\VadSpeechTranscriber;
+use App\AI\Features\SpeechToText\SpeechTranscriberResolver;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -28,7 +29,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CompanyQuestionsGenerator::class, AiCompanyQuestionsGenerator::class);
         $this->app->bind(QuestionGenerator::class, AiQuestionGenerator::class);
         $this->app->bind(VoiceActivityDetector::class, FfmpegVoiceActivityDetector::class);
-        $this->app->bind(SpeechTranscriber::class, VadSpeechTranscriber::class);
+        $this->app->bind(SpeechTranscriber::class, fn (Application $app): SpeechTranscriber => $app
+            ->make(SpeechTranscriberResolver::class)
+            ->resolve());
     }
 
     /**

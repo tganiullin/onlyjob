@@ -121,7 +121,7 @@ function handleTogglePhraseRecord() {
             microphoneStatus.value = 'Идет запись фразы...';
             microphoneStatusError.value = false;
         },
-        onStop: async (blob, mode) => {
+        onStop: async (blob, _mode, _vadResult) => {
             transcribing.value = true;
             microphoneStatus.value = 'Распознаю тестовую фразу...';
             try {
@@ -239,7 +239,7 @@ function handleRecordToggle() {
             answerStatus.value = 'Идет запись ответа...';
             answerStatusError.value = false;
         },
-        onStop: async (blob) => {
+        onStop: async (blob, _mode, _vadResult) => {
             transcribing.value = true;
             answerStatus.value = 'Распознаю ответ...';
             answerStatusError.value = false;
