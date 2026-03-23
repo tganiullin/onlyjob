@@ -5,7 +5,7 @@ function getCsrfToken() {
 }
 
 export function useInterviewApi(config) {
-    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint } = config;
+    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint, integritySignalEndpoint } = config;
 
     const transcribe = async (audioBlob) => {
         const csrf = getCsrfToken();
@@ -89,5 +89,36 @@ export function useInterviewApi(config) {
         return payload;
     };
 
-    return { transcribe, submitAnswer, submitFeedback };
+    const submitIntegritySignal = async ({
+        eventType,
+        occurredAt,
+        interviewQuestionId = null,
+        payload = {},
+    }) => {
+        if (!integritySignalEndpoint) {
+            return;
+        }
+
+        const csrf = getCsrfToken();
+        if (!csrf) {
+            return;
+        }
+
+        await fetch(integritySignalEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({
+                event_type: eventType,
+                occurred_at: occurredAt,
+                interview_question_id: interviewQuestionId,
+                payload,
+            }),
+        });
+    };
+
+    return { transcribe, submitAnswer, submitFeedback, submitIntegritySignal };
 }

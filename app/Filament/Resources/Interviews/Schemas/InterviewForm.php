@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Interviews\Schemas;
 
+use App\Enums\InterviewIntegrityEventType;
 use App\Enums\InterviewStatus;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Repeater;
@@ -12,6 +13,7 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Operation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class InterviewForm
@@ -114,6 +116,66 @@ class InterviewForm
                                     ->disabled()
                                     ->dehydrated(false)
                                     ->rows(3)
+                                    ->columnSpanFull(),
+                            ])
+                            ->columnSpanFull(),
+                    ]),
+                Section::make('Possible cheating events')
+                    ->visibleOn(Operation::Edit)
+                    ->schema([
+                        Repeater::make('integrityEvents')
+                            ->relationship(
+                                modifyQueryUsing: static fn (Builder $query): Builder => $query->limit(50),
+                            )
+                            ->label('Integrity events')
+                            ->defaultItems(0)
+                            ->addable(false)
+                            ->deletable(false)
+                            ->reorderable(false)
+                            ->itemLabel(static function (array $state): string {
+                                $eventType = (string) ($state['event_type'] ?? '');
+                                $occurredAt = (string) ($state['occurred_at'] ?? '-');
+                                $eventLabel = InterviewIntegrityEventType::tryFrom($eventType)?->getLabel() ?? ($eventType !== '' ? $eventType : 'Event');
+
+                                return sprintf('[%s] %s', $occurredAt, $eventLabel);
+                            })
+                            ->collapsible()
+                            ->collapsed()
+                            ->schema([
+                                TextInput::make('event_type')
+                                    ->label('Event')
+                                    ->readOnly()
+                                    ->formatStateUsing(static function (mixed $state): string {
+                                        if ($state instanceof InterviewIntegrityEventType) {
+                                            return (string) $state->getLabel();
+                                        }
+
+                                        if (! is_string($state) || $state === '') {
+                                            return '-';
+                                        }
+
+                                        return InterviewIntegrityEventType::tryFrom($state)?->getLabel() ?? $state;
+                                    }),
+                                DateTimePicker::make('occurred_at')
+                                    ->label('Occurred at')
+                                    ->readOnly()
+                                    ->seconds(false),
+                                TextInput::make('interview_question_id')
+                                    ->label('Interview question ID')
+                                    ->disabled()
+                                    ->dehydrated(false),
+                                Textarea::make('payload')
+                                    ->label('Payload')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->rows(5)
+                                    ->formatStateUsing(static function (mixed $state): string {
+                                        if (! is_array($state) || $state === []) {
+                                            return '-';
+                                        }
+
+                                        return (string) json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                                    })
                                     ->columnSpanFull(),
                             ])
                             ->columnSpanFull(),

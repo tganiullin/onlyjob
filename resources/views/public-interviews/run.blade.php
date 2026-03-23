@@ -15,6 +15,7 @@
     data-answer-endpoint-template="{{ route('public-interviews.questions.answer', ['interview' => $interview, 'interviewQuestion' => '__QUESTION_ID__']) }}"
     data-transcribe-endpoint="{{ route('public-interviews.transcribe', ['interview' => $interview]) }}"
     data-feedback-endpoint="{{ route('public-interviews.feedback', ['interview' => $interview]) }}"
+    data-integrity-signal-endpoint="{{ $integritySignalEndpoint }}"
     data-answer-time-seconds="{{ $answerTimeSeconds }}"
     data-interview-completed="{{ $interviewCompleted ? '1' : '0' }}"
     data-completion-message="{{ $completionMessage }}"
