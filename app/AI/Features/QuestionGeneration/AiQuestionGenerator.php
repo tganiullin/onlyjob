@@ -5,15 +5,17 @@ namespace App\AI\Features\QuestionGeneration;
 use App\AI\AiProviderResolver;
 use App\AI\Data\AiRequest;
 use App\AI\Features\Concerns\ResolvesAiFeatureConfig;
+use App\AI\Features\Concerns\ResolvesPrompt;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
 use BackedEnum;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 final class AiQuestionGenerator implements QuestionGenerator
 {
-    use ResolvesAiFeatureConfig;
+    use ResolvesAiFeatureConfig, ResolvesPrompt;
 
     public function __construct(
         public AiProviderResolver $providerResolver,
@@ -27,17 +29,26 @@ final class AiQuestionGenerator implements QuestionGenerator
         $focus = $this->resolveFocus($context);
         $answerTime = $this->resolveAnswerTime($context);
 
+        $systemPrompt = $this->buildSystemPrompt($positionLevel, $focus, $answerTime);
+        $userPrompt = $this->buildUserPrompt(
+            description: $description,
+            positionLevel: $positionLevel,
+            questionsCount: $questionsCount,
+            focus: $focus,
+            answerTime: $answerTime,
+        );
+
+        Log::info('AiQuestionGenerator: sending request', [
+            'model' => $this->resolveFeatureModel('question_generation'),
+            'system_prompt' => $systemPrompt,
+            'user_prompt' => $userPrompt,
+        ]);
+
         $response = $this->providerResolver
             ->resolveForFeature('question_generation')
             ->generateStructured(new AiRequest(
-                systemPrompt: $this->buildSystemPrompt($positionLevel, $focus, $answerTime),
-                userPrompt: $this->buildUserPrompt(
-                    description: $description,
-                    positionLevel: $positionLevel,
-                    questionsCount: $questionsCount,
-                    focus: $focus,
-                    answerTime: $answerTime,
-                ),
+                systemPrompt: $systemPrompt,
+                userPrompt: $userPrompt,
                 jsonSchema: $this->buildJsonSchema($questionsCount),
                 schemaName: 'position_questions',
                 model: $this->resolveFeatureModel('question_generation'),
@@ -45,7 +56,9 @@ final class AiQuestionGenerator implements QuestionGenerator
                 maxTokens: $this->resolveFeatureMaxTokens('question_generation'),
             ));
 
-        return $this->normalizeQuestions($response->content, $questionsCount);
+        $questions = $this->normalizeQuestions($response->content, $questionsCount);
+
+        return $questions;
     }
 
     private function resolveDescription(array $context): string
@@ -130,17 +143,30 @@ final class AiQuestionGenerator implements QuestionGenerator
 
     private function buildSystemPrompt(PositionLevel $positionLevel, string $focus, PositionAnswerTime $answerTime): string
     {
-        $focusGuideline = $this->resolveFocusGuideline($focus);
-        $levelGuideline = $this->resolveLevelGuideline($positionLevel);
-        $answerTimeGuideline = $this->resolveAnswerTimeGuideline($answerTime);
-        $outputLanguage = $this->resolveOutputLanguageRule();
+        $placeholders = [
+            'level_label' => $positionLevel->getLabel(),
+            'level_guideline' => $this->resolveLevelGuideline($positionLevel),
+            'focus_guideline' => $this->resolveFocusGuideline($focus),
+            'answer_time_guideline' => $this->resolveAnswerTimeGuideline($answerTime),
+            'output_language' => $this->resolveOutputLanguageRule(),
+        ];
 
-        return <<<PROMPT
+        return $this->resolvePrompt(
+            'question_generation',
+            'system_prompt',
+            $this->defaultSystemPrompt(),
+            $placeholders,
+        );
+    }
+
+    private function defaultSystemPrompt(): string
+    {
+        return <<<'PROMPT'
 You are a senior technical interviewer creating structured screening interview questions.
 
 Task:
 - Generate practical interview questions from the position description.
-- Adjust depth and complexity to the target level: {$positionLevel->getLabel()}.
+- Adjust depth and complexity to the target level: {{level_label}}.
 - Keep each question concise, specific, and answerable within the allowed time.
 - Provide one short evaluation instruction for each question.
 - Prefer scenario and problem-solving questions ("How would you...", "What would happen if...", "How would you debug...") over biography questions.
@@ -151,16 +177,16 @@ Task:
 - Avoid stacked multi-part questions.
 
 Level alignment:
-{$levelGuideline}
+{{level_guideline}}
 
 Focus:
-{$focusGuideline}
+{{focus_guideline}}
 
 Time per answer:
-{$answerTimeGuideline}
+{{answer_time_guideline}}
 
 Language:
-{$outputLanguage}
+{{output_language}}
 
 Output rules:
 - Return only valid JSON matching the provided schema.
@@ -187,9 +213,24 @@ PROMPT;
 
         $encodedPayload = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-        return <<<PROMPT
-Generate {$questionsCount} interview questions based on this input:
-{$encodedPayload}
+        $placeholders = [
+            'questions_count' => (string) $questionsCount,
+            'payload_json' => $encodedPayload,
+        ];
+
+        return $this->resolvePrompt(
+            'question_generation',
+            'user_prompt',
+            $this->defaultUserPrompt(),
+            $placeholders,
+        );
+    }
+
+    private function defaultUserPrompt(): string
+    {
+        return <<<'PROMPT'
+Generate {{questions_count}} interview questions based on this input:
+{{payload_json}}
 PROMPT;
     }
 

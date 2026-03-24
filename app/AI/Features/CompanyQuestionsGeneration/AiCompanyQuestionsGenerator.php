@@ -6,11 +6,12 @@ use App\AI\AiProviderResolver;
 use App\AI\Data\AiRequest;
 use App\AI\Features\CompanyQuestionsGeneration\Contracts\CompanyQuestionsGenerator;
 use App\AI\Features\Concerns\ResolvesAiFeatureConfig;
+use App\AI\Features\Concerns\ResolvesPrompt;
 use InvalidArgumentException;
 
 final class AiCompanyQuestionsGenerator implements CompanyQuestionsGenerator
 {
-    use ResolvesAiFeatureConfig;
+    use ResolvesAiFeatureConfig, ResolvesPrompt;
 
     public function __construct(
         public AiProviderResolver $providerResolver,
@@ -48,9 +49,21 @@ final class AiCompanyQuestionsGenerator implements CompanyQuestionsGenerator
 
     private function buildSystemPrompt(): string
     {
-        $outputLanguage = $this->resolveOutputLanguageRule();
+        $placeholders = [
+            'output_language' => $this->resolveOutputLanguageRule(),
+        ];
 
-        return <<<PROMPT
+        return $this->resolvePrompt(
+            'company_questions_generation',
+            'system_prompt',
+            $this->defaultSystemPrompt(),
+            $placeholders,
+        );
+    }
+
+    private function defaultSystemPrompt(): string
+    {
+        return <<<'PROMPT'
 You are an HR assistant creating FAQ-style company questions and concise answers for job candidates.
 
 Task:
@@ -73,7 +86,7 @@ Answer quality:
 - Do not invent confidential or unverifiable details. If detail is not in the description, provide a safe generic answer.
 
 Language:
-{$outputLanguage}
+{{output_language}}
 
 Output rules:
 - Return only valid JSON matching the provided schema.
@@ -90,9 +103,19 @@ PROMPT;
 
         $encodedPayload = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-        return <<<PROMPT
+        return $this->resolvePrompt(
+            'company_questions_generation',
+            'user_prompt',
+            $this->defaultUserPrompt(),
+            ['payload_json' => $encodedPayload],
+        );
+    }
+
+    private function defaultUserPrompt(): string
+    {
+        return <<<'PROMPT'
 Generate company FAQ style questions and answers from this input:
-{$encodedPayload}
+{{payload_json}}
 PROMPT;
     }
 
