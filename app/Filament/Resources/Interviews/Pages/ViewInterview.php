@@ -82,6 +82,10 @@ class ViewInterview extends ViewRecord
                         Textarea::make('summary')
                             ->rows(4)
                             ->columnSpanFull(),
+                        Textarea::make('candidate_custom_question')
+                            ->label('Candidate custom question')
+                            ->rows(3)
+                            ->columnSpanFull(),
                     ]),
                 Section::make('Interview questions')
                     ->icon(Heroicon::ChatBubbleLeftRight)

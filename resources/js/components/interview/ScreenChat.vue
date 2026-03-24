@@ -33,6 +33,10 @@ const props = defineProps({
     feedbackSubmitting: { type: Boolean, default: false },
     feedbackStatus: { type: String, default: '' },
     feedbackStatusError: { type: Boolean, default: false },
+    customQuestion: { type: String, default: '' },
+    customQuestionSubmitting: { type: Boolean, default: false },
+    customQuestionStatus: { type: String, default: '' },
+    customQuestionStatusError: { type: Boolean, default: false },
 });
 const emit = defineEmits([
     'request-microphone',
@@ -42,6 +46,7 @@ const emit = defineEmits([
     'record-toggle',
     'skip-answer',
     'feedback-select',
+    'custom-question-submit',
 ]);
 
 function formatMessageTime() {
@@ -87,6 +92,8 @@ const continueLoading = ref(false);
 const hoveredFeedbackStar = ref(null);
 const showAllCompanyQuestions = ref(false);
 const selectedCompanyQuestionMessages = ref([]);
+const showCustomQuestionForm = ref(false);
+const customQuestionText = ref('');
 
 function handleContinueClick() {
     continueLoading.value = true;
@@ -121,6 +128,14 @@ const visibleCompanyQuestions = computed(() => {
 
     return normalizedCompanyQuestions.value.slice(0, 3);
 });
+
+function handleCustomQuestionSubmit() {
+    const text = customQuestionText.value.trim();
+    if (!text) {
+        return;
+    }
+    emit('custom-question-submit', text);
+}
 
 function handleCompanyQuestionSelect(question) {
     selectedCompanyQuestionMessages.value = [
@@ -426,7 +441,7 @@ onUnmounted(() => {
             </div>
 
             <div
-                v-if="interviewStarted && interviewCompleted && normalizedCompanyQuestions.length > 0"
+                v-if="interviewStarted && interviewCompleted"
                 class="space-y-4 pt-2"
             >
                 <div class="flex items-start gap-3">
@@ -439,7 +454,7 @@ onUnmounted(() => {
                     </div>
                     <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
                         <p>А пока, возможно, есть вопросы о компании.</p>
-                        <p class="mt-1">Выберите вопрос из списка:</p>
+                        <p v-if="normalizedCompanyQuestions.length > 0" class="mt-1">Выберите вопрос из списка:</p>
                     </div>
                 </div>
 
@@ -461,6 +476,14 @@ onUnmounted(() => {
                     >
                         Показать все вопросы
                     </button>
+                    <button
+                        v-if="!customQuestion && !showCustomQuestionForm"
+                        type="button"
+                        class="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[var(--color-brand)] bg-white px-6 text-sm font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)] hover:text-white"
+                        @click="showCustomQuestionForm = true"
+                    >
+                        Другой вопрос
+                    </button>
                 </div>
 
                 <div v-for="message in selectedCompanyQuestionMessages" :key="message.key" class="space-y-4">
@@ -479,6 +502,71 @@ onUnmounted(() => {
                         </div>
                         <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
                             {{ message.answer }}
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="showCustomQuestionForm && !customQuestion" class="flex items-start justify-end gap-3">
+                    <div class="w-full max-w-[620px] rounded-2xl rounded-tr-md bg-white px-6 py-5 shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                        <textarea
+                            v-model="customQuestionText"
+                            :disabled="customQuestionSubmitting"
+                            rows="3"
+                            maxlength="1000"
+                            placeholder="Напишите ваш вопрос..."
+                            class="w-full resize-none rounded-xl border border-[#d8dcf2] bg-[#f8f9ff] px-4 py-3 text-sm text-[#2f344d] placeholder-[#a0a5c0] outline-none transition-colors focus:border-[var(--color-brand)] disabled:opacity-60"
+                        ></textarea>
+                        <div class="mt-3 flex items-center justify-between gap-3">
+                            <p
+                                v-if="customQuestionStatus"
+                                class="text-sm"
+                                :class="customQuestionStatusError ? 'text-red-600' : 'text-[#4f556f]'"
+                            >
+                                {{ customQuestionStatus }}
+                            </p>
+                            <div class="ml-auto flex gap-2">
+                                <button
+                                    type="button"
+                                    :disabled="customQuestionSubmitting"
+                                    class="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-[#d8dcf2] bg-white px-5 text-sm font-medium text-[#2f334c] transition-colors hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                                    @click="showCustomQuestionForm = false; customQuestionText = '';"
+                                >
+                                    Отмена
+                                </button>
+                                <button
+                                    type="button"
+                                    :disabled="customQuestionSubmitting || !customQuestionText.trim()"
+                                    class="btn-brand inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                    @click="handleCustomQuestionSubmit"
+                                >
+                                    <span
+                                        v-if="customQuestionSubmitting"
+                                        class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                        aria-hidden="true"
+                                    ></span>
+                                    <template v-else>Отправить</template>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="customQuestion" class="space-y-4">
+                    <div class="flex items-start justify-end gap-3">
+                        <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tr-md bg-[var(--color-brand)] px-6 py-5 text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
+                            {{ customQuestion }}
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                            style="background-color: var(--color-brand);"
+                            aria-hidden="true"
+                        >
+                            L
+                        </div>
+                        <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                            Спасибо! Ваш вопрос передан рекрутеру. Вам ответят в ближайшее время.
                         </div>
                     </div>
                 </div>

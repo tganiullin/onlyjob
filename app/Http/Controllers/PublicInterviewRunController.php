@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
 use App\Http\Requests\StorePublicInterviewAnswerRequest;
+use App\Http\Requests\StorePublicInterviewCustomQuestionRequest;
 use App\Http\Requests\StorePublicInterviewFeedbackRequest;
 use App\Http\Requests\StorePublicInterviewIntegritySignalRequest;
 use App\Http\Requests\TranscribePublicInterviewAudioRequest;
@@ -155,6 +156,28 @@ class PublicInterviewRunController extends Controller
         return response()->json([
             'saved' => true,
             'candidate_feedback_rating' => $rating,
+        ]);
+    }
+
+    public function customQuestion(
+        StorePublicInterviewCustomQuestionRequest $request,
+        Interview $interview,
+    ): JsonResponse {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        if (! $this->isInterviewTerminal($interview)) {
+            return response()->json([
+                'message' => 'Custom question is available only after completing the interview.',
+            ], 409);
+        }
+
+        $interview->forceFill([
+            'candidate_custom_question' => $request->validated('candidate_custom_question'),
+        ])->save();
+
+        return response()->json([
+            'saved' => true,
+            'candidate_custom_question' => $interview->candidate_custom_question,
         ]);
     }
 

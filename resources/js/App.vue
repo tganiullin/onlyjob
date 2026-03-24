@@ -12,6 +12,7 @@ const props = defineProps({
     answerEndpointTemplate: { type: String, default: '' },
     transcribeEndpoint: { type: String, default: '' },
     feedbackEndpoint: { type: String, default: '' },
+    customQuestionEndpoint: { type: String, default: '' },
     integritySignalEndpoint: { type: String, default: '' },
     answerTimeSeconds: { type: Number, default: 120 },
     interviewCompleted: { type: Boolean, default: false },
@@ -22,6 +23,7 @@ const props = defineProps({
     answerTimeLabel: { type: String, default: '2 минуты' },
     logoUrl: { type: String, default: '' },
     initialCandidateFeedbackRating: { type: Number, default: null },
+    initialCandidateCustomQuestion: { type: String, default: '' },
 });
 
 const questions = computed(() => Array.isArray(props.questions) ? props.questions : []);
@@ -68,10 +70,20 @@ const feedbackSubmitting = ref(false);
 const feedbackStatus = ref('');
 const feedbackStatusError = ref(false);
 
+const customQuestion = ref(
+    typeof props.initialCandidateCustomQuestion === 'string' && props.initialCandidateCustomQuestion.trim() !== ''
+        ? props.initialCandidateCustomQuestion.trim()
+        : '',
+);
+const customQuestionSubmitting = ref(false);
+const customQuestionStatus = ref('');
+const customQuestionStatusError = ref(false);
+
 const api = useInterviewApi({
     transcribeEndpoint: props.transcribeEndpoint,
     answerEndpointTemplate: props.answerEndpointTemplate,
     feedbackEndpoint: props.feedbackEndpoint,
+    customQuestionEndpoint: props.customQuestionEndpoint,
     integritySignalEndpoint: props.integritySignalEndpoint,
 });
 
@@ -396,6 +408,27 @@ async function handleFeedbackSelect(rating) {
     }
 }
 
+async function handleCustomQuestionSubmit(questionText) {
+    if (customQuestionSubmitting.value) {
+        return;
+    }
+
+    customQuestionSubmitting.value = true;
+    customQuestionStatus.value = 'Отправляем ваш вопрос...';
+    customQuestionStatusError.value = false;
+
+    try {
+        await api.submitCustomQuestion(questionText);
+        customQuestion.value = questionText;
+        customQuestionStatus.value = '';
+    } catch (err) {
+        customQuestionStatus.value = err instanceof Error ? err.message : 'Не удалось отправить вопрос.';
+        customQuestionStatusError.value = true;
+    } finally {
+        customQuestionSubmitting.value = false;
+    }
+}
+
 watch(
     () => [
         currentScreen.value,
@@ -487,6 +520,10 @@ onUnmounted(() => {
                     :feedback-submitting="feedbackSubmitting"
                     :feedback-status="feedbackStatus"
                     :feedback-status-error="feedbackStatusError"
+                    :custom-question="customQuestion"
+                    :custom-question-submitting="customQuestionSubmitting"
+                    :custom-question-status="customQuestionStatus"
+                    :custom-question-status-error="customQuestionStatusError"
                     @request-microphone="handleRequestMicrophone"
                     @toggle-phrase-record="handleTogglePhraseRecord"
                     @continue="handleChatContinue"
@@ -494,6 +531,7 @@ onUnmounted(() => {
                     @record-toggle="handleRecordToggle"
                     @skip-answer="handleSkipAnswer"
                     @feedback-select="handleFeedbackSelect"
+                    @custom-question-submit="handleCustomQuestionSubmit"
                 />
             </div>
         </main>

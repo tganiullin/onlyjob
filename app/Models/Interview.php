@@ -31,6 +31,7 @@ class Interview extends Model
         'status',
         'score',
         'candidate_feedback_rating',
+        'candidate_custom_question',
         'summary',
         'started_at',
         'completed_at',
