@@ -5,7 +5,7 @@ function getCsrfToken() {
 }
 
 export function useInterviewApi(config) {
-    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint, integritySignalEndpoint } = config;
+    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint, customQuestionEndpoint, integritySignalEndpoint } = config;
 
     const transcribe = async (audioBlob, interviewQuestionId = null) => {
         const csrf = getCsrfToken();
@@ -93,6 +93,33 @@ export function useInterviewApi(config) {
         return payload;
     };
 
+    const submitCustomQuestion = async (candidateCustomQuestion) => {
+        const csrf = getCsrfToken();
+        if (!csrf) throw new Error('Не найден CSRF токен. Обновите страницу.');
+        if (!customQuestionEndpoint) throw new Error('Маршрут отправки вопроса не настроен.');
+
+        const res = await fetch(customQuestionEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ candidate_custom_question: candidateCustomQuestion }),
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const msg =
+                payload?.errors?.candidate_custom_question?.[0] ??
+                payload?.message ??
+                'Не удалось отправить вопрос.';
+            throw new Error(msg);
+        }
+
+        return payload;
+    };
+
     const submitIntegritySignal = async ({
         eventType,
         occurredAt,
@@ -124,5 +151,5 @@ export function useInterviewApi(config) {
         });
     };
 
-    return { transcribe, submitAnswer, submitFeedback, submitIntegritySignal };
+    return { transcribe, submitAnswer, submitFeedback, submitCustomQuestion, submitIntegritySignal };
 }

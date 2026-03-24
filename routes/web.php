@@ -34,6 +34,9 @@ Route::prefix('public/interviews')->name('public-interviews.')->group(function (
     Route::post('{interview}/feedback', [PublicInterviewRunController::class, 'feedback'])
         ->middleware('throttle:public-interview-answer')
         ->name('feedback');
+    Route::post('{interview}/custom-question', [PublicInterviewRunController::class, 'customQuestion'])
+        ->middleware('throttle:public-interview-answer')
+        ->name('custom-question');
     Route::post('{interview}/integrity-signal', [PublicInterviewRunController::class, 'integritySignal'])
         ->middleware('throttle:public-interview-integrity-signal')
         ->name('integrity-signal');

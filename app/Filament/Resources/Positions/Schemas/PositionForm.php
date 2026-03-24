@@ -22,7 +22,6 @@ use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Operation;
 use Throwable;
 
 class PositionForm
@@ -93,7 +92,6 @@ class PositionForm
                         Tab::make('Interview questions')
                             ->schema([
                                 Section::make('AI assistant')
-                                    ->visibleOn(Operation::Create)
                                     ->schema([
                                         Textarea::make('ai_description')
                                             ->label('Position description')
@@ -151,7 +149,6 @@ class PositionForm
                         Tab::make('Company questions')
                             ->schema([
                                 Section::make('AI assistant')
-                                    ->visibleOn(Operation::Create)
                                     ->schema([
                                         Textarea::make('ai_company_description')
                                             ->label('Company or vacancy description')

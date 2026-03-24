@@ -645,6 +645,155 @@ class PublicInterviewFlowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_custom_question_endpoint_saves_candidate_question_after_interview_completion(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+            'text' => 'What is MVC?',
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'candidate_custom_question' => null,
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 1023456,
+            'telegram_chat_id' => 1023456,
+            'telegram_confirmed_username' => 'custom_question_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.custom-question', ['interview' => $interview]), [
+                'candidate_custom_question' => 'Какой стек технологий используется в компании?',
+            ]);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'saved' => true,
+                'candidate_custom_question' => 'Какой стек технологий используется в компании?',
+            ]);
+
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'candidate_custom_question' => 'Какой стек технологий используется в компании?',
+        ]);
+    }
+
+    public function test_custom_question_endpoint_rejects_empty_question(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 1123456,
+            'telegram_chat_id' => 1123456,
+            'telegram_confirmed_username' => 'custom_question_empty_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.custom-question', ['interview' => $interview]), [
+                'candidate_custom_question' => '',
+            ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['candidate_custom_question']);
+    }
+
+    public function test_custom_question_endpoint_rejects_question_exceeding_max_length(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 1223456,
+            'telegram_chat_id' => 1223456,
+            'telegram_confirmed_username' => 'custom_question_long_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.custom-question', ['interview' => $interview]), [
+                'candidate_custom_question' => str_repeat('a', 1001),
+            ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['candidate_custom_question']);
+    }
+
+    public function test_custom_question_endpoint_is_rejected_before_interview_completion(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::InProgress,
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 1323456,
+            'telegram_chat_id' => 1323456,
+            'telegram_confirmed_username' => 'custom_question_early_user',
+        ]);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.custom-question', ['interview' => $interview]), [
+                'candidate_custom_question' => 'Какой график работы?',
+            ]);
+
+        $response->assertStatus(409);
+
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'candidate_custom_question' => null,
+        ]);
+    }
+
+    public function test_custom_question_endpoint_is_forbidden_without_active_public_interview_session(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'status' => InterviewStatus::Completed,
+            'completed_at' => now(),
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 1423456,
+            'telegram_chat_id' => 1423456,
+            'telegram_confirmed_username' => 'custom_question_forbidden_user',
+        ]);
+
+        $this->withSession(['public_interview_id' => null])
+            ->postJson(route('public-interviews.custom-question', ['interview' => $interview]), [
+                'candidate_custom_question' => 'Какой график работы?',
+            ])
+            ->assertForbidden();
+    }
+
     public function test_integrity_signal_endpoint_saves_event_for_active_interview_session(): void
     {
         $position = Position::factory()->public()->create();
@@ -905,6 +1054,7 @@ class PublicInterviewFlowTest extends TestCase
         $transcribeRoute = Route::getRoutes()->getByName('public-interviews.transcribe');
         $answerRoute = Route::getRoutes()->getByName('public-interviews.questions.answer');
         $feedbackRoute = Route::getRoutes()->getByName('public-interviews.feedback');
+        $customQuestionRoute = Route::getRoutes()->getByName('public-interviews.custom-question');
         $integritySignalRoute = Route::getRoutes()->getByName('public-interviews.integrity-signal');
 
         $this->assertNotNull($startRoute);
@@ -912,6 +1062,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->assertNotNull($transcribeRoute);
         $this->assertNotNull($answerRoute);
         $this->assertNotNull($feedbackRoute);
+        $this->assertNotNull($customQuestionRoute);
         $this->assertNotNull($integritySignalRoute);
 
         $this->assertContains('throttle:public-position-start', $startRoute->gatherMiddleware());
@@ -919,6 +1070,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->assertContains('throttle:public-interview-transcribe', $transcribeRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $answerRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $feedbackRoute->gatherMiddleware());
+        $this->assertContains('throttle:public-interview-answer', $customQuestionRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-integrity-signal', $integritySignalRoute->gatherMiddleware());
     }
 
