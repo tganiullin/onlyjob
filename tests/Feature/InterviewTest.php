@@ -200,7 +200,7 @@ class InterviewTest extends TestCase
             ->assertCanNotSeeTableRecords([$passedFrontendInterview]);
     }
 
-    public function test_admin_edit_page_displays_possible_cheating_events_section(): void
+    public function test_admin_view_page_displays_possible_cheating_events_section(): void
     {
         $this->actingAs(User::factory()->create());
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -227,7 +227,7 @@ class InterviewTest extends TestCase
             ],
         ]);
 
-        $response = $this->get(InterviewResource::getUrl('edit', ['record' => $interview]));
+        $response = $this->get(InterviewResource::getUrl('view', ['record' => $interview]));
 
         $response->assertOk();
         $response->assertSee('Possible cheating events');

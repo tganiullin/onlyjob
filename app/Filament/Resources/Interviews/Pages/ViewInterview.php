@@ -1,88 +1,92 @@
 <?php
 
-namespace App\Filament\Resources\Interviews\Schemas;
+namespace App\Filament\Resources\Interviews\Pages;
 
 use App\Enums\InterviewIntegrityEventType;
 use App\Enums\InterviewStatus;
+use App\Filament\Resources\Interviews\InterviewResource;
+use App\Jobs\CheckInterviewJob;
+use App\Models\Interview;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Operation;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
-class InterviewForm
+class ViewInterview extends ViewRecord
 {
-    public static function configure(Schema $schema): Schema
+    protected static string $resource = InterviewResource::class;
+
+    public function form(Schema $schema): Schema
     {
         return $schema
-            ->columns(1)
+            ->columns(2)
             ->components([
                 Section::make('Candidate')
+                    ->icon(Heroicon::User)
+                    ->columns(2)
                     ->schema([
                         Select::make('position_id')
                             ->label('Position')
                             ->relationship('position', 'title')
-                            ->searchable()
-                            ->preload()
-                            ->disabled()
-                            ->dehydrated(false),
+                            ->prefixIcon(Heroicon::Briefcase)
+                            ->columnSpanFull(),
                         TextInput::make('first_name')
                             ->label('First name')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->maxLength(255),
+                            ->prefixIcon(Heroicon::User),
                         TextInput::make('last_name')
                             ->label('Last name')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->maxLength(255),
+                            ->prefixIcon(Heroicon::User),
                         TextInput::make('telegram')
                             ->label('Telegram')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->maxLength(255),
+                            ->prefixIcon(Heroicon::PaperAirplane),
+                        TextInput::make('email')
+                            ->label('Email')
+                            ->prefixIcon(Heroicon::Envelope),
+                        TextInput::make('phone')
+                            ->label('Phone')
+                            ->prefixIcon(Heroicon::Phone),
                     ]),
                 Section::make('Interview result')
+                    ->icon(Heroicon::ChartBar)
+                    ->columns(2)
                     ->schema([
                         Select::make('status')
                             ->options(InterviewStatus::class)
-                            ->default(InterviewStatus::PendingConfirmation->value)
-                            ->required(),
-                        ToggleButtons::make('candidate_feedback_rating')
-                            ->label('Candidate feedback rating')
-                            ->options(array_combine(range(1, 5), range(1, 5)))
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->inline(),
+                            ->prefixIcon(Heroicon::Flag),
                         TextInput::make('score')
-                            ->disabled()
-                            ->dehydrated(false),
-                        Textarea::make('summary')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->rows(4)
+                            ->prefixIcon(Heroicon::Star),
+                        ToggleButtons::make('candidate_feedback_rating')
+                            ->label('Candidate feedback')
+                            ->options(array_combine(range(1, 5), range(1, 5)))
+                            ->inline()
                             ->columnSpanFull(),
                         DateTimePicker::make('started_at')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->prefixIcon(Heroicon::PlayCircle),
                         DateTimePicker::make('completed_at')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->prefixIcon(Heroicon::CheckCircle),
+                        Textarea::make('summary')
+                            ->rows(4)
+                            ->columnSpanFull(),
                     ]),
                 Section::make('Interview questions')
-                    ->visibleOn(Operation::Edit)
+                    ->icon(Heroicon::ChatBubbleLeftRight)
                     ->schema([
                         Repeater::make('interviewQuestions')
                             ->relationship()
-                            ->label('Interview questions')
+                            ->label('')
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
@@ -95,39 +99,30 @@ class InterviewForm
                             ->schema([
                                 Textarea::make('question_text')
                                     ->label('Question')
-                                    ->readOnly()
                                     ->rows(3)
                                     ->columnSpanFull(),
                                 Textarea::make('candidate_answer')
                                     ->label('Candidate answer')
-                                    ->disabled()
-                                    ->dehydrated(false)
                                     ->rows(4)
                                     ->columnSpanFull(),
                                 TextInput::make('answer_score')
-                                    ->label('Answer score')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->maxValue(10),
+                                    ->label('Score')
+                                    ->prefixIcon(Heroicon::Star),
                                 Textarea::make('ai_comment')
                                     ->label('AI comment')
-                                    ->disabled()
-                                    ->dehydrated(false)
                                     ->rows(3)
                                     ->columnSpanFull(),
                             ])
                             ->columnSpanFull(),
                     ]),
                 Section::make('Possible cheating events')
-                    ->visibleOn(Operation::Edit)
+                    ->icon(Heroicon::ShieldExclamation)
                     ->schema([
                         Repeater::make('integrityEvents')
                             ->relationship(
                                 modifyQueryUsing: static fn (Builder $query): Builder => $query->limit(50),
                             )
-                            ->label('Integrity events')
+                            ->label('')
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
@@ -144,7 +139,7 @@ class InterviewForm
                             ->schema([
                                 TextInput::make('event_type')
                                     ->label('Event')
-                                    ->readOnly()
+                                    ->prefixIcon(Heroicon::ExclamationTriangle)
                                     ->formatStateUsing(static function (mixed $state): string {
                                         if ($state instanceof InterviewIntegrityEventType) {
                                             return (string) $state->getLabel();
@@ -158,16 +153,10 @@ class InterviewForm
                                     }),
                                 DateTimePicker::make('occurred_at')
                                     ->label('Occurred at')
-                                    ->readOnly()
-                                    ->seconds(false),
-                                TextInput::make('interview_question_id')
-                                    ->label('Interview question ID')
-                                    ->disabled()
-                                    ->dehydrated(false),
+                                    ->seconds(false)
+                                    ->prefixIcon(Heroicon::Clock),
                                 Textarea::make('payload')
                                     ->label('Payload')
-                                    ->disabled()
-                                    ->dehydrated(false)
                                     ->rows(5)
                                     ->formatStateUsing(static function (mixed $state): string {
                                         if (! is_array($state) || $state === []) {
@@ -181,5 +170,29 @@ class InterviewForm
                             ->columnSpanFull(),
                     ]),
             ]);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('queueAiReview')
+                ->label('Queue AI review')
+                ->color('primary')
+                ->requiresConfirmation()
+                ->visible(static fn (Interview $record): bool => in_array($record->status, [
+                    InterviewStatus::Completed,
+                    InterviewStatus::ReviewFailed,
+                ], true))
+                ->action(static function (Interview $record): void {
+                    $record->forceFill([
+                        'status' => InterviewStatus::QueuedForReview,
+                    ])->save();
+
+                    CheckInterviewJob::dispatch($record->id);
+                })
+                ->successNotificationTitle('Interview has been queued for AI review.'),
+            EditAction::make(),
+            DeleteAction::make(),
+        ];
     }
 }
