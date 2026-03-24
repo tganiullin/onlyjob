@@ -3,6 +3,7 @@
 namespace App\AI\Features\SpeechToText;
 
 use App\AI\Exceptions\AiProviderException;
+use App\AI\Features\Concerns\ResolvesPrompt;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use Illuminate\Http\UploadedFile;
 use OpenAI\Contracts\ClientContract;
@@ -11,6 +12,8 @@ use Throwable;
 
 final class OpenAiSpeechTranscriber implements SpeechTranscriber
 {
+    use ResolvesPrompt;
+
     public function __construct(
         public ClientContract $client,
     ) {}
@@ -135,6 +138,15 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
     }
 
     private function speechToTextPrompt(): string
+    {
+        return $this->resolvePrompt(
+            'speech_to_text',
+            'prompt',
+            $this->defaultSpeechToTextPrompt(),
+        );
+    }
+
+    private function defaultSpeechToTextPrompt(): string
     {
         return 'The speaker may switch between Russian and English in one sentence. '
             .'Transcribe exactly what is said and never invent words that are not present in the audio. '

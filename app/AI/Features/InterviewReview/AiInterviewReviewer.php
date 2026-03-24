@@ -5,6 +5,7 @@ namespace App\AI\Features\InterviewReview;
 use App\AI\AiProviderResolver;
 use App\AI\Data\AiRequest;
 use App\AI\Features\Concerns\ResolvesAiFeatureConfig;
+use App\AI\Features\Concerns\ResolvesPrompt;
 use App\AI\Features\InterviewReview\Contracts\InterviewReviewer;
 use App\AI\Features\InterviewReview\Data\InterviewReviewResult;
 use App\Models\Interview;
@@ -12,7 +13,7 @@ use App\Models\InterviewQuestion;
 
 final class AiInterviewReviewer implements InterviewReviewer
 {
-    use ResolvesAiFeatureConfig;
+    use ResolvesAiFeatureConfig, ResolvesPrompt;
 
     public function __construct(
         public AiProviderResolver $providerResolver,
@@ -39,9 +40,21 @@ final class AiInterviewReviewer implements InterviewReviewer
 
     private function buildSystemPrompt(): string
     {
-        $outputLanguage = $this->resolveOutputLanguage();
+        $placeholders = [
+            'output_language' => $this->resolveOutputLanguage(),
+        ];
 
-        return <<<PROMPT
+        return $this->resolvePrompt(
+            'interview_review',
+            'system_prompt',
+            $this->defaultSystemPrompt(),
+            $placeholders,
+        );
+    }
+
+    private function defaultSystemPrompt(): string
+    {
+        return <<<'PROMPT'
 You are a strict senior technical interviewer.
 
 Task:
@@ -57,9 +70,9 @@ Scoring rules:
 - Do not skip any question.
 
 Language rules:
-- Write all natural-language fields strictly in {$outputLanguage}.
-- Specifically, "summary" and each "ai_comment" must be in {$outputLanguage}.
-- Even if candidate answers are in another language, still return text in {$outputLanguage}.
+- Write all natural-language fields strictly in {{output_language}}.
+- Specifically, "summary" and each "ai_comment" must be in {{output_language}}.
+- Even if candidate answers are in another language, still return text in {{output_language}}.
 
 Output rules:
 - Return only valid JSON matching the required schema.
@@ -101,14 +114,27 @@ PROMPT;
 
         $encodedPayload = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-        $outputLanguage = $this->resolveOutputLanguage();
+        $placeholders = [
+            'output_language' => $this->resolveOutputLanguage(),
+            'payload_json' => $encodedPayload,
+        ];
 
-        return <<<PROMPT
+        return $this->resolvePrompt(
+            'interview_review',
+            'user_prompt',
+            $this->defaultUserPrompt(),
+            $placeholders,
+        );
+    }
+
+    private function defaultUserPrompt(): string
+    {
+        return <<<'PROMPT'
 Evaluate the interview data and return a structured review.
-All textual fields in your JSON response must be in {$outputLanguage}.
+All textual fields in your JSON response must be in {{output_language}}.
 
 Interview payload:
-{$encodedPayload}
+{{payload_json}}
 PROMPT;
     }
 
