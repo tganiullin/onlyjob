@@ -71,6 +71,38 @@ class PositionForm
                             ->default(PositionLevel::Middle->value)
                             ->required(),
                     ]),
+                Section::make('Follow-up questions')
+                    ->columnSpanFull()
+                    ->schema([
+                        Toggle::make('follow_up_enabled')
+                            ->label('Enable AI follow-up questions')
+                            ->helperText('When enabled, AI will generate follow-up questions for weak or incomplete answers during the interview.')
+                            ->live(),
+                        ToggleButtons::make('follow_up_score_threshold')
+                            ->label('Score threshold')
+                            ->helperText('Answers estimated below this score will trigger a follow-up question.')
+                            ->options([
+                                '2.00' => '2',
+                                '3.00' => '3',
+                                '4.00' => '4',
+                                '5.00' => '5',
+                                '6.00' => '6',
+                                '7.00' => '7',
+                            ])
+                            ->inline()
+                            ->default('4.00')
+                            ->visible(static fn (Get $get): bool => (bool) $get('follow_up_enabled')),
+                        ToggleButtons::make('max_follow_ups_per_question')
+                            ->label('Max follow-ups per question')
+                            ->options([
+                                1 => '1',
+                                2 => '2',
+                                3 => '3',
+                            ])
+                            ->inline()
+                            ->default(1)
+                            ->visible(static fn (Get $get): bool => (bool) $get('follow_up_enabled')),
+                    ]),
                 Section::make('Public access')
                     ->columnSpanFull()
                     ->schema([

@@ -82,17 +82,27 @@ PROMPT;
 
     private function buildUserPrompt(Interview $interview): string
     {
-        $questions = $interview->interviewQuestions
-            ->sortBy('sort_order')
-            ->values()
-            ->map(static function (InterviewQuestion $question): array {
-                return [
+        $interviewQuestions = $interview->interviewQuestions->sortBy('sort_order')->values();
+
+        $questionsById = $interviewQuestions->keyBy('id');
+
+        $questions = $interviewQuestions
+            ->map(static function (InterviewQuestion $question) use ($questionsById): array {
+                $data = [
                     'interview_question_id' => $question->id,
                     'sort_order' => $question->sort_order,
                     'question' => $question->question_text,
                     'evaluation_instructions' => $question->evaluation_instructions_snapshot,
                     'candidate_answer' => $question->candidate_answer,
                 ];
+
+                if ($question->is_follow_up) {
+                    $data['is_follow_up'] = true;
+                    $parent = $questionsById->get($question->parent_interview_question_id);
+                    $data['parent_question_text'] = $parent?->question_text;
+                }
+
+                return $data;
             })
             ->all();
 
