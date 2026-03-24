@@ -5,15 +5,20 @@ namespace App\Http\Controllers;
 use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
 use App\Http\Requests\StorePublicInterviewAnswerRequest;
+use App\Http\Requests\StorePublicInterviewCustomQuestionRequest;
 use App\Http\Requests\StorePublicInterviewFeedbackRequest;
+use App\Http\Requests\StorePublicInterviewIntegritySignalRequest;
 use App\Http\Requests\TranscribePublicInterviewAudioRequest;
 use App\Models\Interview;
+use App\Models\InterviewIntegrityEvent;
 use App\Models\InterviewQuestion;
 use App\Models\Position;
 use App\Models\PositionCompanyQuestion;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class PublicInterviewRunController extends Controller
@@ -60,6 +65,7 @@ class PublicInterviewRunController extends Controller
             'interviewCompleted' => $this->isInterviewTerminal($interview),
             'completionMessage' => self::COMPLETION_MESSAGE,
             'candidateFeedbackRating' => $interview->candidate_feedback_rating,
+            'integritySignalEndpoint' => route('public-interviews.integrity-signal', ['interview' => $interview]),
         ]);
     }
 
@@ -153,6 +159,28 @@ class PublicInterviewRunController extends Controller
         ]);
     }
 
+    public function customQuestion(
+        StorePublicInterviewCustomQuestionRequest $request,
+        Interview $interview,
+    ): JsonResponse {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        if (! $this->isInterviewTerminal($interview)) {
+            return response()->json([
+                'message' => 'Custom question is available only after completing the interview.',
+            ], 409);
+        }
+
+        $interview->forceFill([
+            'candidate_custom_question' => $request->validated('candidate_custom_question'),
+        ])->save();
+
+        return response()->json([
+            'saved' => true,
+            'candidate_custom_question' => $interview->candidate_custom_question,
+        ]);
+    }
+
     public function transcribe(
         TranscribePublicInterviewAudioRequest $request,
         Interview $interview,
@@ -166,14 +194,51 @@ class PublicInterviewRunController extends Controller
             ]);
         }
 
-        /** @var \Illuminate\Http\UploadedFile $audioFile */
+        /** @var UploadedFile $audioFile */
         $audioFile = $request->file('audio');
 
+        $text = $speechTranscriber->transcribe(
+            $audioFile,
+            (string) $request->validated('language'),
+        );
+
+        $this->storeAnswerAudio($request, $interview, $audioFile);
+
         return response()->json([
-            'text' => $speechTranscriber->transcribe(
-                $audioFile,
-                (string) $request->validated('language'),
-            ),
+            'text' => $text,
+        ]);
+    }
+
+    public function integritySignal(
+        StorePublicInterviewIntegritySignalRequest $request,
+        Interview $interview,
+    ): JsonResponse {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        $interviewQuestionId = $request->validated('interview_question_id');
+
+        if ($interviewQuestionId !== null) {
+            $belongsToInterview = $interview->interviewQuestions()
+                ->whereKey($interviewQuestionId)
+                ->exists();
+
+            if (! $belongsToInterview) {
+                return response()->json([
+                    'message' => 'Interview question does not belong to current interview.',
+                ], 422);
+            }
+        }
+
+        InterviewIntegrityEvent::query()->create([
+            'interview_id' => $interview->id,
+            'interview_question_id' => $interviewQuestionId,
+            'event_type' => $request->validated('event_type'),
+            'occurred_at' => $request->date('occurred_at'),
+            'payload' => $request->validated('payload') ?? [],
+        ]);
+
+        return response()->json([
+            'saved' => true,
         ]);
     }
 
@@ -256,5 +321,57 @@ class PublicInterviewRunController extends Controller
             'started_at' => $interview->started_at ?? now(),
             'completed_at' => $interview->completed_at ?? now(),
         ])->save();
+    }
+
+    private function storeAnswerAudio(
+        TranscribePublicInterviewAudioRequest $request,
+        Interview $interview,
+        UploadedFile $audioFile,
+    ): void {
+        $questionId = $request->validated('interview_question_id');
+
+        if ($questionId === null) {
+            return;
+        }
+
+        $interviewQuestion = $interview->interviewQuestions()
+            ->whereKey((int) $questionId)
+            ->first();
+
+        if (! $interviewQuestion instanceof InterviewQuestion) {
+            return;
+        }
+
+        $extension = $this->resolveAudioExtension($audioFile);
+        $path = sprintf('interview-audio/%d/%d.%s', $interview->id, $interviewQuestion->id, $extension);
+
+        Storage::put($path, $audioFile->getContent());
+
+        $interviewQuestion->forceFill([
+            'candidate_answer_audio_path' => $path,
+        ])->save();
+    }
+
+    private function resolveAudioExtension(UploadedFile $file): string
+    {
+        $mime = strtolower($file->getMimeType() ?? '');
+
+        if (str_contains($mime, 'ogg')) {
+            return 'ogg';
+        }
+
+        if (str_contains($mime, 'wav')) {
+            return 'wav';
+        }
+
+        if (str_contains($mime, 'mp4') || str_contains($mime, 'm4a')) {
+            return 'm4a';
+        }
+
+        if (str_contains($mime, 'mpeg') || str_contains($mime, 'mp3')) {
+            return 'mp3';
+        }
+
+        return 'webm';
     }
 }

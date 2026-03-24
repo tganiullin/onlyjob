@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, reactive, watch, onUnmounted } from 'vue';
+import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue';
 import ScreenStart from './components/interview/ScreenStart.vue';
 import ScreenChat from './components/interview/ScreenChat.vue';
 import { useQuestionTimer } from './composables/useQuestionTimer.js';
@@ -12,6 +12,8 @@ const props = defineProps({
     answerEndpointTemplate: { type: String, default: '' },
     transcribeEndpoint: { type: String, default: '' },
     feedbackEndpoint: { type: String, default: '' },
+    customQuestionEndpoint: { type: String, default: '' },
+    integritySignalEndpoint: { type: String, default: '' },
     answerTimeSeconds: { type: Number, default: 120 },
     interviewCompleted: { type: Boolean, default: false },
     completionMessage: { type: String, default: 'Спасибо! Вы успешно завершили первый этап интервью.' },
@@ -21,6 +23,7 @@ const props = defineProps({
     answerTimeLabel: { type: String, default: '2 минуты' },
     logoUrl: { type: String, default: '' },
     initialCandidateFeedbackRating: { type: Number, default: null },
+    initialCandidateCustomQuestion: { type: String, default: '' },
 });
 
 const questions = computed(() => Array.isArray(props.questions) ? props.questions : []);
@@ -67,10 +70,21 @@ const feedbackSubmitting = ref(false);
 const feedbackStatus = ref('');
 const feedbackStatusError = ref(false);
 
+const customQuestion = ref(
+    typeof props.initialCandidateCustomQuestion === 'string' && props.initialCandidateCustomQuestion.trim() !== ''
+        ? props.initialCandidateCustomQuestion.trim()
+        : '',
+);
+const customQuestionSubmitting = ref(false);
+const customQuestionStatus = ref('');
+const customQuestionStatusError = ref(false);
+
 const api = useInterviewApi({
     transcribeEndpoint: props.transcribeEndpoint,
     answerEndpointTemplate: props.answerEndpointTemplate,
     feedbackEndpoint: props.feedbackEndpoint,
+    customQuestionEndpoint: props.customQuestionEndpoint,
+    integritySignalEndpoint: props.integritySignalEndpoint,
 });
 
 const { remainingSeconds, formatTimer, start: startTimer, stop: stopTimer } = useQuestionTimer(
@@ -88,12 +102,55 @@ const {
 const isRecordingPhrase = computed(() => recordingMode.value === 'phrase');
 const isRecordingAnswer = computed(() => recordingMode.value === 'answer');
 
-const interviewFinished = computed(() => completed.value || currentIndex.value >= questions.value.length);
 const showRecordHint = ref(false);
 const highlightRecordButton = ref(false);
 
 const answeredByRecordingQuestionIds = new Set();
 let recordHintTimeoutId = null;
+let tabHiddenStartedAt = null;
+
+function shouldTrackIntegritySignals() {
+    return props.integritySignalEndpoint !== '' && currentScreen.value === 'interview' && !completed.value;
+}
+
+function sendIntegritySignal(eventType, payload = {}) {
+    if (!shouldTrackIntegritySignals()) {
+        return;
+    }
+
+    const occurredAt = new Date().toISOString();
+    const interviewQuestionId = resolveCurrentQuestionId();
+
+    void api.submitIntegritySignal({
+        eventType,
+        occurredAt,
+        interviewQuestionId,
+        payload,
+    }).catch(() => {});
+}
+
+function handleDocumentVisibilityChange() {
+    if (!shouldTrackIntegritySignals()) {
+        return;
+    }
+
+    if (document.hidden) {
+        tabHiddenStartedAt = Date.now();
+        sendIntegritySignal('tab_hidden', {
+            current_screen: currentScreen.value,
+        });
+
+        return;
+    }
+
+    const hiddenForMs = tabHiddenStartedAt === null ? null : Math.max(0, Date.now() - tabHiddenStartedAt);
+    tabHiddenStartedAt = null;
+
+    sendIntegritySignal('tab_visible', {
+        hidden_for_ms: hiddenForMs,
+        current_screen: currentScreen.value,
+    });
+}
 
 function clearRecordHintTimer() {
     if (recordHintTimeoutId !== null) {
@@ -300,7 +357,7 @@ function handleRecordToggle() {
             answerStatus.value = 'Распознаю ответ...';
             answerStatusError.value = false;
             try {
-                const text = await api.transcribe(blob);
+                const text = await api.transcribe(blob, resolveCurrentQuestionId());
                 const normalized = text === '' ? 'Не знаю ответ' : text;
                 await submitAnswer(normalized);
             } catch (err) {
@@ -351,6 +408,27 @@ async function handleFeedbackSelect(rating) {
     }
 }
 
+async function handleCustomQuestionSubmit(questionText) {
+    if (customQuestionSubmitting.value) {
+        return;
+    }
+
+    customQuestionSubmitting.value = true;
+    customQuestionStatus.value = 'Отправляем ваш вопрос...';
+    customQuestionStatusError.value = false;
+
+    try {
+        await api.submitCustomQuestion(questionText);
+        customQuestion.value = questionText;
+        customQuestionStatus.value = '';
+    } catch (err) {
+        customQuestionStatus.value = err instanceof Error ? err.message : 'Не удалось отправить вопрос.';
+        customQuestionStatusError.value = true;
+    } finally {
+        customQuestionSubmitting.value = false;
+    }
+}
+
 watch(
     () => [
         currentScreen.value,
@@ -367,8 +445,13 @@ watch(
     { immediate: true },
 );
 
+onMounted(() => {
+    document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
+});
+
 onUnmounted(() => {
     clearRecordHintTimer();
+    document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
 });
 </script>
 
@@ -437,6 +520,10 @@ onUnmounted(() => {
                     :feedback-submitting="feedbackSubmitting"
                     :feedback-status="feedbackStatus"
                     :feedback-status-error="feedbackStatusError"
+                    :custom-question="customQuestion"
+                    :custom-question-submitting="customQuestionSubmitting"
+                    :custom-question-status="customQuestionStatus"
+                    :custom-question-status-error="customQuestionStatusError"
                     @request-microphone="handleRequestMicrophone"
                     @toggle-phrase-record="handleTogglePhraseRecord"
                     @continue="handleChatContinue"
@@ -444,6 +531,7 @@ onUnmounted(() => {
                     @record-toggle="handleRecordToggle"
                     @skip-answer="handleSkipAnswer"
                     @feedback-select="handleFeedbackSelect"
+                    @custom-question-submit="handleCustomQuestionSubmit"
                 />
             </div>
         </main>

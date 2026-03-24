@@ -14,6 +14,8 @@ if (el) {
         answerEndpointTemplate: el.dataset.answerEndpointTemplate ?? '',
         transcribeEndpoint: el.dataset.transcribeEndpoint ?? '',
         feedbackEndpoint: el.dataset.feedbackEndpoint ?? '',
+        customQuestionEndpoint: el.dataset.customQuestionEndpoint ?? '',
+        integritySignalEndpoint: el.dataset.integritySignalEndpoint ?? '',
         answerTimeSeconds: Number.parseInt(el.dataset.answerTimeSeconds ?? '120', 10),
         interviewCompleted: el.dataset.interviewCompleted === '1',
         completionMessage:
@@ -25,5 +27,6 @@ if (el) {
         answerTimeLabel: el.dataset.answerTimeLabel ?? '2 минуты',
         logoUrl: el.dataset.logoUrl ?? '',
         initialCandidateFeedbackRating: Number.parseInt(el.dataset.candidateFeedbackRating ?? '', 10) || null,
+        initialCandidateCustomQuestion: el.dataset.candidateCustomQuestion ?? '',
     }).mount(el);
 }

@@ -63,6 +63,14 @@ class AppServiceProvider extends ServiceProvider
             ));
         });
 
+        RateLimiter::for('public-interview-integrity-signal', function (Request $request): Limit {
+            return Limit::perMinute(120)->by(sprintf(
+                'public-interview-integrity-signal:%s:%s',
+                (string) $request->ip(),
+                $this->resolveRouteSegmentKey($request, 'interview'),
+            ));
+        });
+
         RateLimiter::for('public-interview-confirmation-status', function (Request $request): Limit {
             return Limit::perMinute(30)->by(sprintf(
                 'public-interview-confirmation-status:%s:%s',

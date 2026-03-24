@@ -5,9 +5,9 @@ function getCsrfToken() {
 }
 
 export function useInterviewApi(config) {
-    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint } = config;
+    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint, customQuestionEndpoint, integritySignalEndpoint } = config;
 
-    const transcribe = async (audioBlob) => {
+    const transcribe = async (audioBlob, interviewQuestionId = null) => {
         const csrf = getCsrfToken();
         if (!csrf) throw new Error('Не найден CSRF токен. Обновите страницу.');
         if (!transcribeEndpoint) throw new Error('Маршрут транскрибации не настроен.');
@@ -16,6 +16,10 @@ export function useInterviewApi(config) {
         const formData = new FormData();
         formData.append('audio', audioBlob, `recording.${ext}`);
         formData.append('language', 'auto');
+
+        if (interviewQuestionId !== null && interviewQuestionId !== undefined) {
+            formData.append('interview_question_id', String(interviewQuestionId));
+        }
 
         const res = await fetch(transcribeEndpoint, {
             method: 'POST',
@@ -89,5 +93,63 @@ export function useInterviewApi(config) {
         return payload;
     };
 
-    return { transcribe, submitAnswer, submitFeedback };
+    const submitCustomQuestion = async (candidateCustomQuestion) => {
+        const csrf = getCsrfToken();
+        if (!csrf) throw new Error('Не найден CSRF токен. Обновите страницу.');
+        if (!customQuestionEndpoint) throw new Error('Маршрут отправки вопроса не настроен.');
+
+        const res = await fetch(customQuestionEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ candidate_custom_question: candidateCustomQuestion }),
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const msg =
+                payload?.errors?.candidate_custom_question?.[0] ??
+                payload?.message ??
+                'Не удалось отправить вопрос.';
+            throw new Error(msg);
+        }
+
+        return payload;
+    };
+
+    const submitIntegritySignal = async ({
+        eventType,
+        occurredAt,
+        interviewQuestionId = null,
+        payload = {},
+    }) => {
+        if (!integritySignalEndpoint) {
+            return;
+        }
+
+        const csrf = getCsrfToken();
+        if (!csrf) {
+            return;
+        }
+
+        await fetch(integritySignalEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({
+                event_type: eventType,
+                occurred_at: occurredAt,
+                interview_question_id: interviewQuestionId,
+                payload,
+            }),
+        });
+    };
+
+    return { transcribe, submitAnswer, submitFeedback, submitCustomQuestion, submitIntegritySignal };
 }

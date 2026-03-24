@@ -31,6 +31,7 @@ class Interview extends Model
         'status',
         'score',
         'candidate_feedback_rating',
+        'candidate_custom_question',
         'summary',
         'started_at',
         'completed_at',
@@ -70,6 +71,13 @@ class Interview extends Model
     public function interviewQuestions(): HasMany
     {
         return $this->hasMany(InterviewQuestion::class);
+    }
+
+    public function integrityEvents(): HasMany
+    {
+        return $this->hasMany(InterviewIntegrityEvent::class)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id');
     }
 
     public function telegramConfirmation(): HasOne
