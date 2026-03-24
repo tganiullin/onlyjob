@@ -6,8 +6,10 @@ use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
 use App\Http\Requests\StorePublicInterviewAnswerRequest;
 use App\Http\Requests\StorePublicInterviewFeedbackRequest;
+use App\Http\Requests\StorePublicInterviewIntegritySignalRequest;
 use App\Http\Requests\TranscribePublicInterviewAudioRequest;
 use App\Models\Interview;
+use App\Models\InterviewIntegrityEvent;
 use App\Models\InterviewQuestion;
 use App\Models\Position;
 use App\Models\PositionCompanyQuestion;
@@ -60,6 +62,7 @@ class PublicInterviewRunController extends Controller
             'interviewCompleted' => $this->isInterviewTerminal($interview),
             'completionMessage' => self::COMPLETION_MESSAGE,
             'candidateFeedbackRating' => $interview->candidate_feedback_rating,
+            'integritySignalEndpoint' => route('public-interviews.integrity-signal', ['interview' => $interview]),
         ]);
     }
 
@@ -174,6 +177,39 @@ class PublicInterviewRunController extends Controller
                 $audioFile,
                 (string) $request->validated('language'),
             ),
+        ]);
+    }
+
+    public function integritySignal(
+        StorePublicInterviewIntegritySignalRequest $request,
+        Interview $interview,
+    ): JsonResponse {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        $interviewQuestionId = $request->validated('interview_question_id');
+
+        if ($interviewQuestionId !== null) {
+            $belongsToInterview = $interview->interviewQuestions()
+                ->whereKey($interviewQuestionId)
+                ->exists();
+
+            if (! $belongsToInterview) {
+                return response()->json([
+                    'message' => 'Interview question does not belong to current interview.',
+                ], 422);
+            }
+        }
+
+        InterviewIntegrityEvent::query()->create([
+            'interview_id' => $interview->id,
+            'interview_question_id' => $interviewQuestionId,
+            'event_type' => $request->validated('event_type'),
+            'occurred_at' => $request->date('occurred_at'),
+            'payload' => $request->validated('payload') ?? [],
+        ]);
+
+        return response()->json([
+            'saved' => true,
         ]);
     }
 

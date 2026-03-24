@@ -72,6 +72,13 @@ class Interview extends Model
         return $this->hasMany(InterviewQuestion::class);
     }
 
+    public function integrityEvents(): HasMany
+    {
+        return $this->hasMany(InterviewIntegrityEvent::class)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id');
+    }
+
     public function telegramConfirmation(): HasOne
     {
         return $this->hasOne(InterviewTelegramConfirmation::class);

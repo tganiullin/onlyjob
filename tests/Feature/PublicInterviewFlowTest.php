@@ -645,6 +645,115 @@ class PublicInterviewFlowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_integrity_signal_endpoint_saves_event_for_active_interview_session(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->count(2)->create([
+            'position_id' => $position->id,
+        ]);
+
+        $interview = $this->startAndConfirmInterview($position)->load('interviewQuestions');
+        $interviewQuestion = $interview->interviewQuestions->first();
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.integrity-signal', ['interview' => $interview]), [
+                'event_type' => 'tab_hidden',
+                'occurred_at' => now()->toIso8601String(),
+                'interview_question_id' => $interviewQuestion?->id,
+                'payload' => [
+                    'current_screen' => 'interview',
+                ],
+            ]);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'saved' => true,
+            ]);
+
+        $this->assertDatabaseHas('interview_integrity_events', [
+            'interview_id' => $interview->id,
+            'interview_question_id' => $interviewQuestion?->id,
+            'event_type' => 'tab_hidden',
+        ]);
+    }
+
+    public function test_integrity_signal_endpoint_validates_payload_and_event_type(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $interview = $this->startAndConfirmInterview($position);
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.integrity-signal', ['interview' => $interview]), [
+                'event_type' => 'unsupported_event',
+                'occurred_at' => 'not-a-date',
+                'payload' => 'invalid-payload',
+            ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['event_type', 'occurred_at', 'payload']);
+    }
+
+    public function test_integrity_signal_endpoint_rejects_foreign_interview_question(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->count(2)->create([
+            'position_id' => $position->id,
+        ]);
+
+        $interview = $this->startAndConfirmInterview($position);
+        $foreignInterview = $this->startAndConfirmInterview($position);
+        $foreignInterviewQuestion = $foreignInterview->interviewQuestions()->firstOrFail();
+
+        $response = $this->withSession(['public_interview_id' => $interview->id])
+            ->postJson(route('public-interviews.integrity-signal', ['interview' => $interview]), [
+                'event_type' => 'tab_visible',
+                'occurred_at' => now()->toIso8601String(),
+                'interview_question_id' => $foreignInterviewQuestion->id,
+                'payload' => [
+                    'current_screen' => 'interview',
+                ],
+            ]);
+
+        $response->assertStatus(422);
+
+        $this->assertDatabaseMissing('interview_integrity_events', [
+            'interview_id' => $interview->id,
+            'interview_question_id' => $foreignInterviewQuestion->id,
+        ]);
+    }
+
+    public function test_integrity_signal_endpoint_is_forbidden_without_active_public_interview_session(): void
+    {
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+            'telegram_confirmed_at' => now(),
+            'telegram_user_id' => 923456,
+            'telegram_chat_id' => 923456,
+            'telegram_confirmed_username' => 'integrity_forbidden_user',
+        ]);
+
+        $this->withSession(['public_interview_id' => null])
+            ->postJson(route('public-interviews.integrity-signal', ['interview' => $interview]), [
+                'event_type' => 'tab_hidden',
+                'occurred_at' => now()->toIso8601String(),
+                'payload' => [
+                    'current_screen' => 'interview',
+                ],
+            ])
+            ->assertForbidden();
+    }
+
     public function test_completed_interview_is_rendered_on_same_run_page_without_finished_redirect(): void
     {
         $position = Position::factory()->public()->create();
@@ -796,18 +905,21 @@ class PublicInterviewFlowTest extends TestCase
         $transcribeRoute = Route::getRoutes()->getByName('public-interviews.transcribe');
         $answerRoute = Route::getRoutes()->getByName('public-interviews.questions.answer');
         $feedbackRoute = Route::getRoutes()->getByName('public-interviews.feedback');
+        $integritySignalRoute = Route::getRoutes()->getByName('public-interviews.integrity-signal');
 
         $this->assertNotNull($startRoute);
         $this->assertNotNull($confirmationStatusRoute);
         $this->assertNotNull($transcribeRoute);
         $this->assertNotNull($answerRoute);
         $this->assertNotNull($feedbackRoute);
+        $this->assertNotNull($integritySignalRoute);
 
         $this->assertContains('throttle:public-position-start', $startRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-confirmation-status', $confirmationStatusRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-transcribe', $transcribeRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $answerRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $feedbackRoute->gatherMiddleware());
+        $this->assertContains('throttle:public-interview-integrity-signal', $integritySignalRoute->gatherMiddleware());
     }
 
     /**

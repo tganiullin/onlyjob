@@ -14,6 +14,7 @@ if (el) {
         answerEndpointTemplate: el.dataset.answerEndpointTemplate ?? '',
         transcribeEndpoint: el.dataset.transcribeEndpoint ?? '',
         feedbackEndpoint: el.dataset.feedbackEndpoint ?? '',
+        integritySignalEndpoint: el.dataset.integritySignalEndpoint ?? '',
         answerTimeSeconds: Number.parseInt(el.dataset.answerTimeSeconds ?? '120', 10),
         interviewCompleted: el.dataset.interviewCompleted === '1',
         completionMessage:

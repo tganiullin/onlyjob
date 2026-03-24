@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\InterviewIntegrityEventType;
 use App\Enums\InterviewStatus;
+use App\Filament\Resources\Interviews\InterviewResource;
 use App\Filament\Resources\Interviews\Pages\ListInterviews;
 use App\Models\Interview;
+use App\Models\InterviewIntegrityEvent;
 use App\Models\Position;
 use App\Models\Question;
 use App\Models\User;
@@ -195,5 +198,44 @@ class InterviewTest extends TestCase
             ->filterTable('position_id', $backendPosition->id)
             ->assertCanSeeTableRecords([$pendingBackendInterview, $completedBackendInterview])
             ->assertCanNotSeeTableRecords([$passedFrontendInterview]);
+    }
+
+    public function test_admin_view_page_displays_possible_cheating_events_section(): void
+    {
+        $this->actingAs(User::factory()->create());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $position = Position::factory()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $interviewQuestion = $interview->interviewQuestions()->firstOrFail();
+
+        InterviewIntegrityEvent::factory()->create([
+            'interview_id' => $interview->id,
+            'interview_question_id' => $interviewQuestion->id,
+            'event_type' => 'tab_hidden',
+            'occurred_at' => now()->subMinutes(1),
+            'payload' => [
+                'current_screen' => 'interview',
+            ],
+        ]);
+
+        $response = $this->get(InterviewResource::getUrl('view', ['record' => $interview]));
+
+        $response->assertOk();
+        $response->assertSee('Possible cheating events');
+    }
+
+    public function test_integrity_event_type_has_human_readable_russian_labels(): void
+    {
+        $this->assertSame('Вкладка скрыта', InterviewIntegrityEventType::TabHidden->getLabel());
+        $this->assertSame('Возврат во вкладку', InterviewIntegrityEventType::TabVisible->getLabel());
     }
 }
