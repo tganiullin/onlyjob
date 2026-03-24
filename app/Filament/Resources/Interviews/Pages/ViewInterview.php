@@ -88,6 +88,7 @@ class ViewInterview extends ViewRecord
                             ->columnSpanFull(),
                     ]),
                 Section::make('Interview questions')
+                    ->columnSpanFull()
                     ->icon(Heroicon::ChatBubbleLeftRight)
                     ->description(static fn (Interview $record): ?string => $record->interviewQuestions()->exists()
                         ? null
@@ -102,7 +103,7 @@ class ViewInterview extends ViewRecord
                             ->deletable(false)
                             ->reorderable(false)
                             ->itemLabel(static fn (array $state): ?string => filled($state['question_text'] ?? null)
-                                ? Str::limit((string) $state['question_text'], 110)
+                                ? Str::limit((string) $state['question_text'], 200)
                                 : null)
                             ->collapsible()
                             ->collapsed()
@@ -130,6 +131,7 @@ class ViewInterview extends ViewRecord
                             ->columnSpanFull(),
                     ]),
                 Section::make('Possible cheating events')
+                    ->columnSpanFull()
                     ->icon(Heroicon::ShieldExclamation)
                     ->description(static fn (Interview $record): ?string => $record->integrityEvents()->exists()
                         ? null
