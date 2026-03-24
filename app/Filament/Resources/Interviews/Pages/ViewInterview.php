@@ -83,10 +83,14 @@ class ViewInterview extends ViewRecord
                     ]),
                 Section::make('Interview questions')
                     ->icon(Heroicon::ChatBubbleLeftRight)
+                    ->description(static fn (Interview $record): ?string => $record->interviewQuestions()->exists()
+                        ? null
+                        : 'No questions yet.')
                     ->schema([
                         Repeater::make('interviewQuestions')
                             ->relationship()
                             ->label('')
+                            ->hidden(static fn (Interview $record): bool => ! $record->interviewQuestions()->exists())
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
@@ -117,12 +121,16 @@ class ViewInterview extends ViewRecord
                     ]),
                 Section::make('Possible cheating events')
                     ->icon(Heroicon::ShieldExclamation)
+                    ->description(static fn (Interview $record): ?string => $record->integrityEvents()->exists()
+                        ? null
+                        : 'No cheating events detected.')
                     ->schema([
                         Repeater::make('integrityEvents')
                             ->relationship(
                                 modifyQueryUsing: static fn (Builder $query): Builder => $query->limit(50),
                             )
                             ->label('')
+                            ->hidden(static fn (Interview $record): bool => ! $record->integrityEvents()->exists())
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
