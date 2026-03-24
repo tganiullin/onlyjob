@@ -36,6 +36,13 @@ return [
             'max_tokens' => (int) env('AI_COMPANY_QUESTIONS_GENERATION_MAX_TOKENS', 2200),
             'output_language' => env('AI_COMPANY_QUESTIONS_GENERATION_OUTPUT_LANGUAGE', 'ru'),
         ],
+        'follow_up_evaluation' => [
+            'provider' => env('AI_FOLLOW_UP_EVALUATION_PROVIDER', env('AI_PROVIDER', 'openai')),
+            'model' => env('AI_FOLLOW_UP_EVALUATION_MODEL', env('AI_OPENAI_MODEL', 'gpt-4o-mini')),
+            'temperature' => (float) env('AI_FOLLOW_UP_EVALUATION_TEMPERATURE', 0.3),
+            'max_tokens' => (int) env('AI_FOLLOW_UP_EVALUATION_MAX_TOKENS', 800),
+            'output_language' => env('AI_FOLLOW_UP_EVALUATION_OUTPUT_LANGUAGE', 'ru'),
+        ],
         'speech_to_text' => [
             'provider' => env('AI_SPEECH_TO_TEXT_PROVIDER', env('AI_PROVIDER', 'openai')),
             'model' => env('AI_SPEECH_TO_TEXT_MODEL', 'gpt-4o-mini-transcribe'),
