@@ -11,6 +11,7 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
@@ -83,10 +85,14 @@ class ViewInterview extends ViewRecord
                     ]),
                 Section::make('Interview questions')
                     ->icon(Heroicon::ChatBubbleLeftRight)
+                    ->description(static fn (Interview $record): ?string => $record->interviewQuestions()->exists()
+                        ? null
+                        : 'No questions yet.')
                     ->schema([
                         Repeater::make('interviewQuestions')
                             ->relationship()
                             ->label('')
+                            ->hidden(static fn (Interview $record): bool => ! $record->interviewQuestions()->exists())
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
@@ -97,6 +103,8 @@ class ViewInterview extends ViewRecord
                             ->collapsible()
                             ->collapsed()
                             ->schema([
+                                Hidden::make('id'),
+                                Hidden::make('candidate_answer_audio_path'),
                                 Textarea::make('question_text')
                                     ->label('Question')
                                     ->rows(3)
@@ -104,6 +112,8 @@ class ViewInterview extends ViewRecord
                                 Textarea::make('candidate_answer')
                                     ->label('Candidate answer')
                                     ->rows(4)
+                                    ->columnSpanFull(),
+                                View::make('filament.schemas.components.interview-audio-player')
                                     ->columnSpanFull(),
                                 TextInput::make('answer_score')
                                     ->label('Score')
@@ -117,12 +127,16 @@ class ViewInterview extends ViewRecord
                     ]),
                 Section::make('Possible cheating events')
                     ->icon(Heroicon::ShieldExclamation)
+                    ->description(static fn (Interview $record): ?string => $record->integrityEvents()->exists()
+                        ? null
+                        : 'No cheating events detected.')
                     ->schema([
                         Repeater::make('integrityEvents')
                             ->relationship(
                                 modifyQueryUsing: static fn (Builder $query): Builder => $query->limit(50),
                             )
                             ->label('')
+                            ->hidden(static fn (Interview $record): bool => ! $record->integrityEvents()->exists())
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
