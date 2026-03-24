@@ -29,6 +29,7 @@ class TranscribePublicInterviewAudioRequest extends FormRequest
                 'max:25600',
             ],
             'language' => ['required', 'string', 'in:auto,en-US,en-GB,ru-RU,browser-default'],
+            'interview_question_id' => ['nullable', 'integer'],
         ];
     }
 

@@ -21,6 +21,7 @@ class InterviewQuestion extends Model
         'evaluation_instructions_snapshot',
         'sort_order',
         'candidate_answer',
+        'candidate_answer_audio_path',
         'ai_comment',
         'answer_score',
     ];

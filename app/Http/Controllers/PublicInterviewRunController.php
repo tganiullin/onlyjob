@@ -16,6 +16,8 @@ use App\Models\PositionCompanyQuestion;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class PublicInterviewRunController extends Controller
@@ -169,14 +171,18 @@ class PublicInterviewRunController extends Controller
             ]);
         }
 
-        /** @var \Illuminate\Http\UploadedFile $audioFile */
+        /** @var UploadedFile $audioFile */
         $audioFile = $request->file('audio');
 
+        $text = $speechTranscriber->transcribe(
+            $audioFile,
+            (string) $request->validated('language'),
+        );
+
+        $this->storeAnswerAudio($request, $interview, $audioFile);
+
         return response()->json([
-            'text' => $speechTranscriber->transcribe(
-                $audioFile,
-                (string) $request->validated('language'),
-            ),
+            'text' => $text,
         ]);
     }
 
@@ -292,5 +298,57 @@ class PublicInterviewRunController extends Controller
             'started_at' => $interview->started_at ?? now(),
             'completed_at' => $interview->completed_at ?? now(),
         ])->save();
+    }
+
+    private function storeAnswerAudio(
+        TranscribePublicInterviewAudioRequest $request,
+        Interview $interview,
+        UploadedFile $audioFile,
+    ): void {
+        $questionId = $request->validated('interview_question_id');
+
+        if ($questionId === null) {
+            return;
+        }
+
+        $interviewQuestion = $interview->interviewQuestions()
+            ->whereKey((int) $questionId)
+            ->first();
+
+        if (! $interviewQuestion instanceof InterviewQuestion) {
+            return;
+        }
+
+        $extension = $this->resolveAudioExtension($audioFile);
+        $path = sprintf('interview-audio/%d/%d.%s', $interview->id, $interviewQuestion->id, $extension);
+
+        Storage::put($path, $audioFile->getContent());
+
+        $interviewQuestion->forceFill([
+            'candidate_answer_audio_path' => $path,
+        ])->save();
+    }
+
+    private function resolveAudioExtension(UploadedFile $file): string
+    {
+        $mime = strtolower($file->getMimeType() ?? '');
+
+        if (str_contains($mime, 'ogg')) {
+            return 'ogg';
+        }
+
+        if (str_contains($mime, 'wav')) {
+            return 'wav';
+        }
+
+        if (str_contains($mime, 'mp4') || str_contains($mime, 'm4a')) {
+            return 'm4a';
+        }
+
+        if (str_contains($mime, 'mpeg') || str_contains($mime, 'mp3')) {
+            return 'mp3';
+        }
+
+        return 'webm';
     }
 }

@@ -7,7 +7,7 @@ function getCsrfToken() {
 export function useInterviewApi(config) {
     const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint, integritySignalEndpoint } = config;
 
-    const transcribe = async (audioBlob) => {
+    const transcribe = async (audioBlob, interviewQuestionId = null) => {
         const csrf = getCsrfToken();
         if (!csrf) throw new Error('Не найден CSRF токен. Обновите страницу.');
         if (!transcribeEndpoint) throw new Error('Маршрут транскрибации не настроен.');
@@ -16,6 +16,10 @@ export function useInterviewApi(config) {
         const formData = new FormData();
         formData.append('audio', audioBlob, `recording.${ext}`);
         formData.append('language', 'auto');
+
+        if (interviewQuestionId !== null && interviewQuestionId !== undefined) {
+            formData.append('interview_question_id', String(interviewQuestionId));
+        }
 
         const res = await fetch(transcribeEndpoint, {
             method: 'POST',

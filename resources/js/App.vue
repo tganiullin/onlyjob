@@ -345,7 +345,7 @@ function handleRecordToggle() {
             answerStatus.value = 'Распознаю ответ...';
             answerStatusError.value = false;
             try {
-                const text = await api.transcribe(blob);
+                const text = await api.transcribe(blob, resolveCurrentQuestionId());
                 const normalized = text === '' ? 'Не знаю ответ' : text;
                 await submitAnswer(normalized);
             } catch (err) {
