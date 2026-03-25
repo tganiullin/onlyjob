@@ -17,6 +17,7 @@ class InterviewsByPositionChart extends ChartWidget
     {
         $positions = Interview::query()
             ->join('positions', 'interviews.position_id', '=', 'positions.id')
+            ->whereNull('positions.deleted_at')
             ->selectRaw('positions.title, COUNT(*) as count')
             ->groupBy('positions.id', 'positions.title')
             ->orderByDesc('count')

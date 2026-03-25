@@ -354,6 +354,7 @@ function handleRecordToggle() {
             answerStatusError.value = false;
         },
         onStop: async (blob, _mode, _vadResult) => {
+            stopTimer();
             transcribing.value = true;
             answerStatus.value = 'Распознаю ответ...';
             answerStatusError.value = false;

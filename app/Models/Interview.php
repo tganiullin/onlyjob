@@ -30,6 +30,7 @@ class Interview extends Model
         'phone',
         'status',
         'score',
+        'adequacy_score',
         'candidate_feedback_rating',
         'candidate_custom_question',
         'summary',
@@ -46,6 +47,7 @@ class Interview extends Model
             'position_id' => 'integer',
             'status' => InterviewStatus::class,
             'score' => 'decimal:2',
+            'adequacy_score' => 'decimal:2',
             'candidate_feedback_rating' => 'integer',
             'telegram_confirmed_at' => 'datetime',
             'telegram_user_id' => 'integer',
@@ -120,6 +122,17 @@ class Interview extends Model
 
         $this->forceFill([
             'score' => $averageScore === null ? null : round((float) $averageScore, 2),
+        ])->saveQuietly();
+    }
+
+    public function syncAdequacyScoreFromAnswers(): void
+    {
+        $averageAdequacy = $this->interviewQuestions()
+            ->whereNotNull('adequacy_score')
+            ->avg('adequacy_score');
+
+        $this->forceFill([
+            'adequacy_score' => $averageAdequacy === null ? null : round((float) $averageAdequacy, 2),
         ])->saveQuietly();
     }
 

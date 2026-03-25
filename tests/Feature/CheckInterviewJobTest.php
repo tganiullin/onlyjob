@@ -56,11 +56,13 @@ class CheckInterviewJobTest extends TestCase
                     [
                         'interview_question_id' => $firstQuestion->id,
                         'answer_score' => 8.2,
+                        'adequacy_score' => 9.5,
                         'ai_comment' => 'Correctly explained the core concept and provided a relevant example.',
                     ],
                     [
                         'interview_question_id' => $secondQuestion->id,
                         'answer_score' => 7.0,
+                        'adequacy_score' => 10.0,
                         'ai_comment' => 'Solid answer, but did not cover failure scenarios deeply enough.',
                     ],
                 ],
@@ -83,17 +85,20 @@ class CheckInterviewJobTest extends TestCase
             'status' => InterviewStatus::ReviewedPassed->value,
             'summary' => 'Strong practical backend fundamentals with minor gaps in edge-case handling.',
             'score' => '7.60',
+            'adequacy_score' => '9.75',
         ]);
 
         $this->assertDatabaseHas('interview_questions', [
             'id' => $firstQuestion->id,
             'answer_score' => '8.20',
+            'adequacy_score' => '9.50',
             'ai_comment' => 'Correctly explained the core concept and provided a relevant example.',
         ]);
 
         $this->assertDatabaseHas('interview_questions', [
             'id' => $secondQuestion->id,
             'answer_score' => '7.00',
+            'adequacy_score' => '10.00',
             'ai_comment' => 'Solid answer, but did not cover failure scenarios deeply enough.',
         ]);
     }
@@ -116,11 +121,13 @@ class CheckInterviewJobTest extends TestCase
                     [
                         'interview_question_id' => $firstQuestion->id,
                         'answer_score' => 6.1,
+                        'adequacy_score' => 3.0,
                         'ai_comment' => 'Partial answer with several missed core points.',
                     ],
                     [
                         'interview_question_id' => $secondQuestion->id,
                         'answer_score' => 6.9,
+                        'adequacy_score' => 5.5,
                         'ai_comment' => 'Reasonable approach, but lacks confidence and completeness.',
                     ],
                 ],
@@ -134,6 +141,7 @@ class CheckInterviewJobTest extends TestCase
             'id' => $interview->id,
             'status' => InterviewStatus::ReviewedFailed->value,
             'score' => '6.50',
+            'adequacy_score' => '4.25',
         ]);
     }
 

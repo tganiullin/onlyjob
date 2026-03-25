@@ -24,6 +24,7 @@ class InterviewQuestion extends Model
         'candidate_answer_audio_path',
         'ai_comment',
         'answer_score',
+        'adequacy_score',
     ];
 
     /**
@@ -36,6 +37,7 @@ class InterviewQuestion extends Model
             'question_id' => 'integer',
             'sort_order' => 'integer',
             'answer_score' => 'decimal:2',
+            'adequacy_score' => 'decimal:2',
         ];
     }
 
@@ -55,10 +57,12 @@ class InterviewQuestion extends Model
 
         static::saved(function (InterviewQuestion $interviewQuestion): void {
             $interviewQuestion->interview?->syncScoreFromAnswers();
+            $interviewQuestion->interview?->syncAdequacyScoreFromAnswers();
         });
 
         static::deleted(function (InterviewQuestion $interviewQuestion): void {
             $interviewQuestion->interview?->syncScoreFromAnswers();
+            $interviewQuestion->interview?->syncAdequacyScoreFromAnswers();
         });
     }
 

@@ -31,6 +31,7 @@ use Filament\Tables\Filters\QueryBuilder;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class InterviewResource extends Resource
 {
@@ -72,7 +73,13 @@ class InterviewResource extends Resource
                     ->sortable(),
                 TextColumn::make('score')
                     ->badge()
-                    ->sortable(),
+                    ->sortable()
+                    ->color(static fn (Interview $record): string => self::scoreColor($record->score)),
+                TextColumn::make('adequacy_score')
+                    ->label('Adequacy')
+                    ->badge()
+                    ->sortable()
+                    ->color(static fn (Interview $record): string => self::scoreColor($record->adequacy_score)),
                 TextColumn::make('candidate_feedback_rating')
                     ->label('Candidate feedback')
                     ->sortable(),
@@ -90,7 +97,7 @@ class InterviewResource extends Resource
                     ->options(InterviewStatus::class),
                 SelectFilter::make('position_id')
                     ->label('Position')
-                    ->relationship('position', 'title')
+                    ->relationship('position', 'title', static fn (Builder $query): Builder => $query->withoutTrashed())
                     ->searchable()
                     ->preload(),
                 TernaryFilter::make('completed_at')
@@ -99,6 +106,36 @@ class InterviewResource extends Resource
                     ->placeholder('All')
                     ->trueLabel('Completed')
                     ->falseLabel('Not completed'),
+                SelectFilter::make('score')
+                    ->label('Score')
+                    ->options([
+                        'high' => '7 – 10',
+                        'medium' => '4 – 6.99',
+                        'low' => '1 – 3.99',
+                        'none' => 'No score',
+                    ])
+                    ->query(static fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        'high' => $query->where('score', '>=', 7),
+                        'medium' => $query->where('score', '>=', 4)->where('score', '<', 7),
+                        'low' => $query->where('score', '<', 4),
+                        'none' => $query->whereNull('score'),
+                        default => $query,
+                    }),
+                SelectFilter::make('adequacy_score')
+                    ->label('Adequacy')
+                    ->options([
+                        'high' => '7 – 10',
+                        'medium' => '4 – 6.99',
+                        'low' => '1 – 3.99',
+                        'none' => 'No score',
+                    ])
+                    ->query(static fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        'high' => $query->where('adequacy_score', '>=', 7),
+                        'medium' => $query->where('adequacy_score', '>=', 4)->where('adequacy_score', '<', 7),
+                        'low' => $query->where('adequacy_score', '<', 4),
+                        'none' => $query->whereNull('adequacy_score'),
+                        default => $query,
+                    }),
                 QueryBuilder::make()
                     ->constraints([
                         TextConstraint::make('first_name')
@@ -115,6 +152,9 @@ class InterviewResource extends Resource
                             ->options(InterviewStatus::class)
                             ->multiple(),
                         NumberConstraint::make('score')
+                            ->nullable(),
+                        NumberConstraint::make('adequacy_score')
+                            ->label('Adequacy')
                             ->nullable(),
                         NumberConstraint::make('candidate_feedback_rating')
                             ->label('Candidate feedback')
@@ -160,6 +200,21 @@ class InterviewResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    private static function scoreColor(mixed $score): string
+    {
+        if (! is_numeric($score)) {
+            return 'gray';
+        }
+
+        $value = (float) $score;
+
+        return match (true) {
+            $value >= 7 => 'success',
+            $value >= 4 => 'warning',
+            default => 'danger',
+        };
     }
 
     public static function getRelations(): array
