@@ -17,10 +17,17 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\QueryBuilder\Constraints\DateConstraint;
+use Filament\QueryBuilder\Constraints\NumberConstraint;
+use Filament\QueryBuilder\Constraints\RelationshipConstraint;
+use Filament\QueryBuilder\Constraints\RelationshipConstraint\Operators\IsRelatedToOperator;
+use Filament\QueryBuilder\Constraints\SelectConstraint;
+use Filament\QueryBuilder\Constraints\TextConstraint;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\QueryBuilder;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -129,6 +136,42 @@ class InterviewResource extends Resource
                         'none' => $query->whereNull('adequacy_score'),
                         default => $query,
                     }),
+                QueryBuilder::make()
+                    ->constraints([
+                        TextConstraint::make('first_name')
+                            ->label('Имя'),
+                        TextConstraint::make('last_name')
+                            ->label('Фамилия'),
+                        TextConstraint::make('email')
+                            ->nullable(),
+                        TextConstraint::make('telegram')
+                            ->nullable(),
+                        TextConstraint::make('phone')
+                            ->nullable(),
+                        SelectConstraint::make('status')
+                            ->options(InterviewStatus::class)
+                            ->multiple(),
+                        NumberConstraint::make('score')
+                            ->nullable(),
+                        NumberConstraint::make('adequacy_score')
+                            ->label('Adequacy')
+                            ->nullable(),
+                        NumberConstraint::make('candidate_feedback_rating')
+                            ->label('Candidate feedback')
+                            ->integer()
+                            ->nullable(),
+                        DateConstraint::make('started_at'),
+                        DateConstraint::make('completed_at')
+                            ->nullable(),
+                        DateConstraint::make('created_at'),
+                        RelationshipConstraint::make('position')
+                            ->selectable(
+                                IsRelatedToOperator::make()
+                                    ->titleAttribute('title')
+                                    ->searchable()
+                                    ->multiple(),
+                            ),
+                    ]),
             ])
             ->recordActions([
                 ActionGroup::make([
