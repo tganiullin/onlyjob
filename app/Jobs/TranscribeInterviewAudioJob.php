@@ -33,16 +33,38 @@ class TranscribeInterviewAudioJob implements ShouldQueue
 
     public function handle(SpeechTranscriber $speechTranscriber): void
     {
-        $localPath = Storage::path($this->audioStoragePath);
+        $tempFile = $this->downloadToTempFile();
 
-        $audioFile = new UploadedFile($localPath, basename($localPath), null, null, true);
+        try {
+            $audioFile = new UploadedFile($tempFile, basename($this->audioStoragePath), null, null, true);
 
-        $text = $speechTranscriber->transcribe($audioFile, $this->language);
+            $text = $speechTranscriber->transcribe($audioFile, $this->language);
 
-        Cache::put($this->cacheKey(), [
-            'status' => 'completed',
-            'text' => $text,
-        ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+            Cache::put($this->cacheKey(), [
+                'status' => 'completed',
+                'text' => $text,
+            ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+        } finally {
+            if (is_file($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    private function downloadToTempFile(): string
+    {
+        $extension = pathinfo($this->audioStoragePath, PATHINFO_EXTENSION) ?: 'webm';
+        $tempFile = sprintf('%s/%s.%s', sys_get_temp_dir(), uniqid('transcribe-', true), $extension);
+
+        $contents = Storage::get($this->audioStoragePath);
+
+        if (! is_string($contents) || $contents === '') {
+            throw new \RuntimeException("Audio file not found in storage: {$this->audioStoragePath}");
+        }
+
+        file_put_contents($tempFile, $contents);
+
+        return $tempFile;
     }
 
     public function failed(Throwable $exception): void
