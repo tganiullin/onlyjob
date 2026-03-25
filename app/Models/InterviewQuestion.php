@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InterviewQuestion extends Model
 {
@@ -21,8 +20,6 @@ class InterviewQuestion extends Model
         'question_text',
         'evaluation_instructions_snapshot',
         'sort_order',
-        'is_follow_up',
-        'parent_interview_question_id',
         'candidate_answer',
         'candidate_answer_audio_path',
         'ai_comment',
@@ -38,8 +35,6 @@ class InterviewQuestion extends Model
             'interview_id' => 'integer',
             'question_id' => 'integer',
             'sort_order' => 'integer',
-            'is_follow_up' => 'boolean',
-            'parent_interview_question_id' => 'integer',
             'answer_score' => 'decimal:2',
         ];
     }
@@ -75,15 +70,5 @@ class InterviewQuestion extends Model
     public function question(): BelongsTo
     {
         return $this->belongsTo(Question::class);
-    }
-
-    public function parentQuestion(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_interview_question_id');
-    }
-
-    public function followUpQuestions(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_interview_question_id');
     }
 }

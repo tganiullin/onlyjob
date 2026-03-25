@@ -95,31 +95,20 @@ class ViewInterview extends ViewRecord
                         : 'No questions yet.')
                     ->schema([
                         Repeater::make('interviewQuestions')
-                            ->relationship(
-                                modifyQueryUsing: static fn (Builder $query): Builder => $query
-                                    ->orderBy('sort_order')
-                                    ->orderBy('id'),
-                            )
+                            ->relationship()
                             ->label('')
                             ->hidden(static fn (Interview $record): bool => ! $record->interviewQuestions()->exists())
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
                             ->reorderable(false)
-                            ->itemLabel(static function (array $state): ?string {
-                                if (! filled($state['question_text'] ?? null)) {
-                                    return null;
-                                }
-
-                                $prefix = ! empty($state['is_follow_up']) ? '[Follow-up] ' : '';
-
-                                return $prefix.Str::limit((string) $state['question_text'], 200);
-                            })
+                            ->itemLabel(static fn (array $state): ?string => filled($state['question_text'] ?? null)
+                                ? Str::limit((string) $state['question_text'], 200)
+                                : null)
                             ->collapsible()
                             ->collapsed()
                             ->schema([
                                 Hidden::make('id'),
-                                Hidden::make('is_follow_up'),
                                 Hidden::make('candidate_answer_audio_path'),
                                 Textarea::make('question_text')
                                     ->label('Question')

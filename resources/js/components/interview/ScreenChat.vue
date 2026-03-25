@@ -367,12 +367,6 @@ onUnmounted(() => {
                         v-if="!interviewCompleted && index === currentQuestionIndex"
                         class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
                     >
-                        <span
-                            v-if="question.is_follow_up"
-                            class="mb-2 inline-block rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
-                        >
-                            Уточняющий вопрос
-                        </span>
                         <p class="text-base font-medium leading-relaxed">{{ question.text }}</p>
                         <p class="mt-4 text-center text-2xl font-medium text-[#2c3150]">{{ formatTimer(remainingSeconds) }}</p>
                     </div>
@@ -380,12 +374,6 @@ onUnmounted(() => {
                         v-else
                         class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-4 shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
                     >
-                        <span
-                            v-if="question.is_follow_up"
-                            class="mb-2 inline-block rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
-                        >
-                            Уточняющий вопрос
-                        </span>
                         <p class="text-base font-medium leading-relaxed text-[#6a6f8a]">{{ question.text }}</p>
                         <p class="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-[#289a5f]">
                             <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">

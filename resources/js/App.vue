@@ -297,17 +297,7 @@ async function submitAnswer(candidateAnswer) {
 
         if (payload.next_question?.id) {
             const nextIdx = questions.value.findIndex((q) => Number(q.id) === Number(payload.next_question.id));
-            if (nextIdx >= 0) {
-                currentIndex.value = nextIdx;
-            } else {
-                questions.value.splice(currentIndex.value + 1, 0, {
-                    id: payload.next_question.id,
-                    text: payload.next_question.text,
-                    candidate_answer: null,
-                    is_follow_up: payload.next_question.is_follow_up ?? false,
-                });
-                currentIndex.value = currentIndex.value + 1;
-            }
+            currentIndex.value = nextIdx >= 0 ? nextIdx : currentIndex.value + 1;
         } else {
             currentIndex.value += 1;
         }

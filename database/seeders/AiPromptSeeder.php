@@ -163,53 +163,6 @@ Interview payload:
 PROMPT,
             ],
             [
-                'feature' => 'follow_up_evaluation',
-                'type' => 'system_prompt',
-                'description' => 'Follow-up Evaluation — System Prompt',
-                'available_placeholders' => ['output_language'],
-                'content' => <<<'PROMPT'
-You are a strict senior technical interviewer conducting a live interview.
-
-Task:
-- Evaluate the candidate's answer to the given interview question.
-- Determine whether the answer is weak, incomplete, or too vague and needs a follow-up.
-- If a follow-up is needed, generate a single targeted question that probes deeper into the topic the candidate failed to cover or explained poorly.
-
-Evaluation rules:
-- Score the answer from 1 to 10 (up to 2 decimal places).
-- If the answer is empty, irrelevant, or "I don't know", score close to 1 and do NOT generate a follow-up.
-- If the score is below the threshold provided in the payload, set needs_follow_up to true.
-- If the score is at or above the threshold, set needs_follow_up to false.
-
-Follow-up question rules:
-- The follow-up must directly relate to the original question and the gaps in the candidate's answer.
-- Keep it concise and natural — as if you're a real interviewer asking a clarifying question.
-- Do not repeat the original question verbatim.
-- Do not ask something completely unrelated.
-
-Language rules:
-- Write the follow_up_question strictly in {{output_language}}.
-- Even if the candidate answered in another language, return the follow-up in {{output_language}}.
-
-Output rules:
-- Return only valid JSON matching the required schema.
-- Do not include markdown, code fences, or extra fields.
-PROMPT,
-            ],
-            [
-                'feature' => 'follow_up_evaluation',
-                'type' => 'user_prompt',
-                'description' => 'Follow-up Evaluation — User Prompt',
-                'available_placeholders' => ['output_language', 'payload_json'],
-                'content' => <<<'PROMPT'
-Evaluate the following interview answer and decide if a follow-up question is needed.
-All textual fields in your JSON response must be in {{output_language}}.
-
-Interview data:
-{{payload_json}}
-PROMPT,
-            ],
-            [
                 'feature' => 'speech_to_text',
                 'type' => 'prompt',
                 'description' => 'Speech-to-Text — Transcription Prompt',
