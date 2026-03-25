@@ -68,6 +68,9 @@ class ViewInterview extends ViewRecord
                             ->prefixIcon(Heroicon::Flag),
                         TextInput::make('score')
                             ->prefixIcon(Heroicon::Star),
+                        TextInput::make('adequacy_score')
+                            ->label('Adequacy')
+                            ->prefixIcon(Heroicon::ShieldCheck),
                         ToggleButtons::make('candidate_feedback_rating')
                             ->label('Candidate feedback')
                             ->options(array_combine(range(1, 5), range(1, 5)))
@@ -123,6 +126,9 @@ class ViewInterview extends ViewRecord
                                 TextInput::make('answer_score')
                                     ->label('Score')
                                     ->prefixIcon(Heroicon::Star),
+                                TextInput::make('adequacy_score')
+                                    ->label('Adequacy')
+                                    ->prefixIcon(Heroicon::ShieldCheck),
                                 Textarea::make('ai_comment')
                                     ->label('AI comment')
                                     ->rows(3)
@@ -139,7 +145,10 @@ class ViewInterview extends ViewRecord
                     ->schema([
                         Repeater::make('integrityEvents')
                             ->relationship(
-                                modifyQueryUsing: static fn (Builder $query): Builder => $query->limit(50),
+                                modifyQueryUsing: static fn (Builder $query): Builder => $query
+                                    ->leftJoin('interview_questions', 'interview_questions.id', '=', 'interview_integrity_events.interview_question_id')
+                                    ->select('interview_integrity_events.*', 'interview_questions.question_text as question_text')
+                                    ->limit(50),
                             )
                             ->label('')
                             ->hidden(static fn (Interview $record): bool => ! $record->integrityEvents()->exists())
@@ -151,12 +160,20 @@ class ViewInterview extends ViewRecord
                                 $eventType = (string) ($state['event_type'] ?? '');
                                 $occurredAt = (string) ($state['occurred_at'] ?? '-');
                                 $eventLabel = InterviewIntegrityEventType::tryFrom($eventType)?->getLabel() ?? ($eventType !== '' ? $eventType : 'Event');
+                                $questionHint = filled($state['question_text'] ?? null)
+                                    ? ' — '.Str::limit((string) $state['question_text'], 250)
+                                    : '';
 
-                                return sprintf('[%s] %s', $occurredAt, $eventLabel);
+                                return sprintf('[%s] %s%s', $occurredAt, $eventLabel, $questionHint);
                             })
                             ->collapsible()
                             ->collapsed()
                             ->schema([
+                                TextInput::make('question_text')
+                                    ->label('Question')
+                                    ->prefixIcon(Heroicon::QuestionMarkCircle)
+                                    ->placeholder('—')
+                                    ->columnSpanFull(),
                                 TextInput::make('event_type')
                                     ->label('Event')
                                     ->prefixIcon(Heroicon::ExclamationTriangle)
