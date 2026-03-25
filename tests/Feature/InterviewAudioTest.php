@@ -2,13 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
+use App\Jobs\TranscribeInterviewAudioJob;
 use App\Models\Interview;
 use App\Models\Position;
 use App\Models\Question;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -19,6 +20,7 @@ class InterviewAudioTest extends TestCase
     public function test_transcribe_with_question_id_saves_audio_file_to_storage(): void
     {
         Storage::fake();
+        Queue::fake();
 
         $position = Position::factory()->public()->create();
         Question::factory()->create([
@@ -37,16 +39,6 @@ class InterviewAudioTest extends TestCase
 
         $interviewQuestion = $interview->interviewQuestions()->firstOrFail();
 
-        $fakeTranscriber = new class implements SpeechTranscriber
-        {
-            public function transcribe(UploadedFile $audioFile, string $language): string
-            {
-                return 'Transcribed answer text.';
-            }
-        };
-
-        $this->app->instance(SpeechTranscriber::class, $fakeTranscriber);
-
         $response = $this->withSession(['public_interview_id' => $interview->id])
             ->post(route('public-interviews.transcribe', ['interview' => $interview]), [
                 'audio' => UploadedFile::fake()->create('speech.webm', 128, 'audio/webm'),
@@ -56,17 +48,22 @@ class InterviewAudioTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJson(['text' => 'Transcribed answer text.']);
+            ->assertJson(['status' => 'processing']);
 
         $interviewQuestion->refresh();
         $this->assertNotNull($interviewQuestion->candidate_answer_audio_path);
 
         Storage::assertExists($interviewQuestion->candidate_answer_audio_path);
+
+        Queue::assertPushed(TranscribeInterviewAudioJob::class, function (TranscribeInterviewAudioJob $job) use ($interviewQuestion): bool {
+            return $job->interviewQuestionId === $interviewQuestion->id;
+        });
     }
 
-    public function test_transcribe_without_question_id_does_not_save_audio(): void
+    public function test_transcribe_without_question_id_saves_audio_to_temp_path(): void
     {
         Storage::fake();
+        Queue::fake();
 
         $position = Position::factory()->public()->create();
         Question::factory()->create([
@@ -83,16 +80,6 @@ class InterviewAudioTest extends TestCase
             'telegram_confirmed_username' => 'mic_test_user',
         ]);
 
-        $fakeTranscriber = new class implements SpeechTranscriber
-        {
-            public function transcribe(UploadedFile $audioFile, string $language): string
-            {
-                return 'Test phrase recognition.';
-            }
-        };
-
-        $this->app->instance(SpeechTranscriber::class, $fakeTranscriber);
-
         $response = $this->withSession(['public_interview_id' => $interview->id])
             ->post(route('public-interviews.transcribe', ['interview' => $interview]), [
                 'audio' => UploadedFile::fake()->create('phrase.webm', 64, 'audio/webm'),
@@ -101,14 +88,21 @@ class InterviewAudioTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJson(['text' => 'Test phrase recognition.']);
+            ->assertJson(['status' => 'processing']);
 
-        $this->assertEmpty(Storage::allFiles());
+        $tempFiles = collect(Storage::allFiles('temp-transcriptions'));
+        $this->assertCount(1, $tempFiles);
+
+        Queue::assertPushed(TranscribeInterviewAudioJob::class, function (TranscribeInterviewAudioJob $job): bool {
+            return $job->interviewQuestionId === null
+                && str_starts_with($job->audioStoragePath, 'temp-transcriptions/');
+        });
     }
 
     public function test_transcribe_ignores_question_id_belonging_to_another_interview(): void
     {
         Storage::fake();
+        Queue::fake();
 
         $position = Position::factory()->public()->create();
         Question::factory()->create([
@@ -135,16 +129,6 @@ class InterviewAudioTest extends TestCase
 
         $foreignQuestion = $foreignInterview->interviewQuestions()->firstOrFail();
 
-        $fakeTranscriber = new class implements SpeechTranscriber
-        {
-            public function transcribe(UploadedFile $audioFile, string $language): string
-            {
-                return 'Transcribed.';
-            }
-        };
-
-        $this->app->instance(SpeechTranscriber::class, $fakeTranscriber);
-
         $response = $this->withSession(['public_interview_id' => $interview->id])
             ->post(route('public-interviews.transcribe', ['interview' => $interview]), [
                 'audio' => UploadedFile::fake()->create('speech.webm', 128, 'audio/webm'),
@@ -152,12 +136,13 @@ class InterviewAudioTest extends TestCase
                 'interview_question_id' => $foreignQuestion->id,
             ]);
 
-        $response->assertOk()->assertJson(['text' => 'Transcribed.']);
+        $response->assertOk()->assertJson(['status' => 'processing']);
 
         $foreignQuestion->refresh();
         $this->assertNull($foreignQuestion->candidate_answer_audio_path);
 
-        $this->assertEmpty(Storage::allFiles());
+        $tempFiles = collect(Storage::allFiles('temp-transcriptions'));
+        $this->assertCount(1, $tempFiles);
     }
 
     public function test_audio_stream_route_returns_audio_for_authenticated_user(): void

@@ -27,7 +27,8 @@ class StorePublicInterviewIntegritySignalRequest extends FormRequest
             'event_type' => ['required', 'string', Rule::in(InterviewIntegrityEventType::values())],
             'occurred_at' => ['required', 'date'],
             'interview_question_id' => ['nullable', 'integer', 'exists:interview_questions,id'],
-            'payload' => ['nullable', 'array'],
+            'payload' => ['nullable', 'array', 'max:10'],
+            'payload.*' => ['nullable', 'max:500'],
         ];
     }
 
@@ -41,6 +42,10 @@ class StorePublicInterviewIntegritySignalRequest extends FormRequest
             if (is_array($decodedPayload)) {
                 $payload = $decodedPayload;
             }
+        }
+
+        if (is_array($payload) && strlen((string) json_encode($payload)) > 2048) {
+            $payload = null;
         }
 
         $interviewQuestionId = $this->input('interview_question_id');

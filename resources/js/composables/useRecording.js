@@ -104,10 +104,13 @@ export function useRecording() {
             const stoppedMode = recordingMode.value;
             recordingMode.value = null;
 
-            const blobMime = chunks.value[0]?.type || mimeType || 'audio/webm';
-            const blob = new Blob(chunks.value, { type: blobMime });
+            const collected = chunks.value;
             chunks.value = [];
             recorder.value = null;
+
+            const blobMime = collected[0]?.type || mimeType || 'audio/webm';
+            const blob = new Blob(collected, { type: blobMime });
+            collected.length = 0;
 
             if (blob.size === 0) {
                 onError?.('Пустая запись. Попробуйте еще раз.');
@@ -123,10 +126,14 @@ export function useRecording() {
             }
 
             onStop?.(blob, stoppedMode, vadResult);
-            stopAllTracks();
         };
 
-        recorder.value.start();
+        recorder.value.start(1000);
+    };
+
+    const releaseStream = () => {
+        stopRecording();
+        stopAllTracks();
     };
 
     return {
@@ -137,6 +144,7 @@ export function useRecording() {
         ensureMicrophoneAccess,
         startRecording,
         stopRecording,
+        releaseStream,
         resolveFileExtension,
     };
 }

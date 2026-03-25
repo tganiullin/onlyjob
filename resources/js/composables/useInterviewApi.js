@@ -1,7 +1,14 @@
 import { resolveFileExtension } from './useRecording.js';
 
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_ATTEMPTS = 60;
+
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function useInterviewApi(config) {
@@ -13,7 +20,7 @@ export function useInterviewApi(config) {
         if (!transcribeEndpoint) throw new Error('Маршрут транскрибации не настроен.');
 
         const ext = resolveFileExtension(audioBlob.type || '');
-        const formData = new FormData();
+        let formData = new FormData();
         formData.append('audio', audioBlob, `recording.${ext}`);
         formData.append('language', 'auto');
 
@@ -27,19 +34,51 @@ export function useInterviewApi(config) {
             body: formData,
         });
 
-        const payload = await res.json().catch(() => null);
+        formData = null;
+
+        const uploadPayload = await res.json().catch(() => null);
         if (!res.ok) {
             const msg =
-                payload?.errors?.audio?.[0] ??
-                payload?.errors?.language?.[0] ??
-                payload?.message ??
+                uploadPayload?.errors?.audio?.[0] ??
+                uploadPayload?.errors?.language?.[0] ??
+                uploadPayload?.message ??
                 'Не удалось распознать аудио.';
             throw new Error(msg);
         }
-        if (!payload || typeof payload.text !== 'string') {
-            throw new Error('Некорректный ответ сервера распознавания.');
+
+        if (uploadPayload?.status === 'completed') {
+            return (uploadPayload.text ?? '').trim();
         }
-        return payload.text.trim();
+
+        const statusUrl = uploadPayload?.status_url;
+        if (!statusUrl) {
+            throw new Error('Сервер не вернул адрес для проверки статуса распознавания.');
+        }
+
+        for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+            await sleep(POLL_INTERVAL_MS);
+
+            const pollRes = await fetch(statusUrl, {
+                method: 'GET',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+            });
+
+            const pollPayload = await pollRes.json().catch(() => null);
+
+            if (!pollRes.ok && pollRes.status !== 404) {
+                throw new Error(pollPayload?.message ?? 'Ошибка при проверке статуса распознавания.');
+            }
+
+            if (pollPayload?.status === 'completed') {
+                return (pollPayload.text ?? '').trim();
+            }
+
+            if (pollPayload?.status === 'failed') {
+                throw new Error(pollPayload.error ?? 'Не удалось распознать аудио.');
+            }
+        }
+
+        throw new Error('Превышено время ожидания распознавания. Попробуйте еще раз.');
     };
 
     const submitAnswer = async (questionId, candidateAnswer) => {

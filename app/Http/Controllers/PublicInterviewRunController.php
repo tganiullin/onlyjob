@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
 use App\Http\Requests\StorePublicInterviewAnswerRequest;
 use App\Http\Requests\StorePublicInterviewCustomQuestionRequest;
 use App\Http\Requests\StorePublicInterviewFeedbackRequest;
 use App\Http\Requests\StorePublicInterviewIntegritySignalRequest;
 use App\Http\Requests\TranscribePublicInterviewAudioRequest;
+use App\Jobs\TranscribeInterviewAudioJob;
 use App\Models\Interview;
 use App\Models\InterviewIntegrityEvent;
 use App\Models\InterviewQuestion;
@@ -18,7 +18,9 @@ use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PublicInterviewRunController extends Controller
@@ -184,12 +186,13 @@ class PublicInterviewRunController extends Controller
     public function transcribe(
         TranscribePublicInterviewAudioRequest $request,
         Interview $interview,
-        SpeechTranscriber $speechTranscriber,
     ): JsonResponse {
         $this->abortIfInterviewNotAccessible($interview);
 
         if ($this->isInterviewTerminal($interview)) {
             return response()->json([
+                'transcription_key' => null,
+                'status' => 'completed',
                 'text' => '',
             ]);
         }
@@ -197,16 +200,42 @@ class PublicInterviewRunController extends Controller
         /** @var UploadedFile $audioFile */
         $audioFile = $request->file('audio');
 
-        $text = $speechTranscriber->transcribe(
-            $audioFile,
+        $transcriptionKey = Str::uuid()->toString();
+        $audioStoragePath = $this->storeAudioForTranscription($request, $interview, $audioFile, $transcriptionKey);
+
+        Cache::put("transcription:{$transcriptionKey}", ['status' => 'processing'], now()->addMinutes(10));
+
+        TranscribeInterviewAudioJob::dispatch(
+            $transcriptionKey,
+            $audioStoragePath,
+            $interview->id,
             (string) $request->validated('language'),
+            $request->validated('interview_question_id') !== null
+                ? (int) $request->validated('interview_question_id')
+                : null,
         );
 
-        $this->storeAnswerAudio($request, $interview, $audioFile);
-
         return response()->json([
-            'text' => $text,
+            'transcription_key' => $transcriptionKey,
+            'status' => 'processing',
+            'status_url' => route('public-interviews.transcription-status', [
+                'interview' => $interview,
+                'key' => $transcriptionKey,
+            ]),
         ]);
+    }
+
+    public function transcriptionStatus(Interview $interview, string $key): JsonResponse
+    {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        $entry = Cache::get("transcription:{$key}");
+
+        if (! is_array($entry)) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        return response()->json($entry);
     }
 
     public function integritySignal(
@@ -323,33 +352,36 @@ class PublicInterviewRunController extends Controller
         ])->save();
     }
 
-    private function storeAnswerAudio(
+    private function storeAudioForTranscription(
         TranscribePublicInterviewAudioRequest $request,
         Interview $interview,
         UploadedFile $audioFile,
-    ): void {
+        string $transcriptionKey,
+    ): string {
+        $extension = $this->resolveAudioExtension($audioFile);
         $questionId = $request->validated('interview_question_id');
 
-        if ($questionId === null) {
-            return;
+        if ($questionId !== null) {
+            $interviewQuestion = $interview->interviewQuestions()
+                ->whereKey((int) $questionId)
+                ->first();
+
+            if ($interviewQuestion instanceof InterviewQuestion) {
+                $path = sprintf('interview-audio/%d/%d.%s', $interview->id, $interviewQuestion->id, $extension);
+                Storage::put($path, $audioFile->getContent());
+
+                $interviewQuestion->forceFill([
+                    'candidate_answer_audio_path' => $path,
+                ])->save();
+
+                return $path;
+            }
         }
 
-        $interviewQuestion = $interview->interviewQuestions()
-            ->whereKey((int) $questionId)
-            ->first();
-
-        if (! $interviewQuestion instanceof InterviewQuestion) {
-            return;
-        }
-
-        $extension = $this->resolveAudioExtension($audioFile);
-        $path = sprintf('interview-audio/%d/%d.%s', $interview->id, $interviewQuestion->id, $extension);
-
+        $path = sprintf('temp-transcriptions/%s.%s', $transcriptionKey, $extension);
         Storage::put($path, $audioFile->getContent());
 
-        $interviewQuestion->forceFill([
-            'candidate_answer_audio_path' => $path,
-        ])->save();
+        return $path;
     }
 
     private function resolveAudioExtension(UploadedFile $file): string

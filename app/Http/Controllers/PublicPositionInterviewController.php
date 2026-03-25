@@ -34,6 +34,11 @@ class PublicPositionInterviewController extends Controller
 
         $validated = $request->validated();
 
+        $sessionFingerprint = $this->telegramAccountConfirmationService->resolveSessionFingerprint(
+            (string) $request->ip(),
+            (string) $request->userAgent(),
+        );
+
         $confirmation = $this->telegramAccountConfirmationService->startOrReusePendingConfirmation(
             $position,
             [
@@ -42,15 +47,13 @@ class PublicPositionInterviewController extends Controller
                 'email' => $validated['email'] ?? null,
                 'telegram' => $validated['telegram'],
             ],
-            $this->telegramAccountConfirmationService->resolveSessionFingerprint(
-                (string) $request->ip(),
-                (string) $request->userAgent(),
-            ),
+            $sessionFingerprint,
             $validated['client_request_id'],
         );
 
         $request->session()->forget('public_interview_id');
         $request->session()->put('public_pending_confirmation_status_token', $confirmation->status_token);
+        $request->session()->put('public_pending_confirmation_fingerprint', $sessionFingerprint);
 
         $responsePayload = [
             'status' => 'pending_confirmation',
@@ -76,13 +79,18 @@ class PublicPositionInterviewController extends Controller
     {
         $position = $this->findPublicPositionByToken($token);
 
-        $statusResult = $this->telegramAccountConfirmationService->resolvePendingConfirmationStatus(
-            $position,
-            $statusToken,
+        $sessionFingerprint = (string) $request->session()->get(
+            'public_pending_confirmation_fingerprint',
             $this->telegramAccountConfirmationService->resolveSessionFingerprint(
                 (string) $request->ip(),
                 (string) $request->userAgent(),
             ),
+        );
+
+        $statusResult = $this->telegramAccountConfirmationService->resolvePendingConfirmationStatus(
+            $position,
+            $statusToken,
+            $sessionFingerprint,
         );
 
         if ($statusResult['status'] === 'not_found') {
