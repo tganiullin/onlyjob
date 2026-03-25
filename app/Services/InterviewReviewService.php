@@ -32,6 +32,7 @@ final class InterviewReviewService
             ])->saveQuietly();
 
             $freshInterview->syncScoreFromAnswers();
+            $freshInterview->syncAdequacyScoreFromAnswers();
             $freshInterview->refresh();
             $this->syncFinalStatus($freshInterview);
         });
@@ -68,6 +69,7 @@ final class InterviewReviewService
 
             $interviewQuestion->forceFill([
                 'answer_score' => $questionResult->answerScore,
+                'adequacy_score' => $questionResult->adequacyScore,
                 'ai_comment' => $questionResult->aiComment,
             ])->saveQuietly();
         }

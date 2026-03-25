@@ -62,11 +62,21 @@ Task:
 - Provide one concise and practical AI comment per question.
 - Provide an overall interview summary.
 
-Scoring rules:
+Scoring rules (answer_score):
 - Score each answer from 1 to 10.
 - Use up to 2 decimal places.
 - Keep scores realistic and grounded in the candidate answer only.
 - If answer is empty or irrelevant, score it close to 1 and explain why.
+- Do not skip any question.
+
+Adequacy scoring rules (adequacy_score):
+- Rate the behavioral appropriateness of each answer from 1 to 10.
+- Use up to 2 decimal places.
+- This is NOT about technical correctness or relevance (that is answer_score).
+- Evaluate ONLY: profanity, obscene language, insults, aggression, hostility, spam, provocations, or other inappropriate behavior in an interview context.
+- 10 = fully appropriate and professional conduct.
+- 1 = severe violations (profanity, aggression, insults).
+- Most normal answers should score 9-10 even if technically wrong.
 - Do not skip any question.
 
 Language rules:
@@ -161,12 +171,17 @@ PROMPT;
                     'items' => [
                         'type' => 'object',
                         'additionalProperties' => false,
-                        'required' => ['interview_question_id', 'answer_score', 'ai_comment'],
+                        'required' => ['interview_question_id', 'answer_score', 'adequacy_score', 'ai_comment'],
                         'properties' => [
                             'interview_question_id' => [
                                 'type' => 'integer',
                             ],
                             'answer_score' => [
+                                'type' => 'number',
+                                'minimum' => 1,
+                                'maximum' => 10,
+                            ],
+                            'adequacy_score' => [
                                 'type' => 'number',
                                 'minimum' => 1,
                                 'maximum' => 10,
