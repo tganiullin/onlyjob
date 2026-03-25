@@ -9,6 +9,7 @@ final readonly class InterviewQuestionReviewResult
     public function __construct(
         public int $interviewQuestionId,
         public float $answerScore,
+        public float $adequacyScore,
         public string $aiComment,
     ) {}
 
@@ -19,6 +20,7 @@ final readonly class InterviewQuestionReviewResult
     {
         $questionId = $payload['interview_question_id'] ?? null;
         $answerScore = $payload['answer_score'] ?? null;
+        $adequacyScore = $payload['adequacy_score'] ?? null;
         $aiComment = $payload['ai_comment'] ?? null;
 
         if (! is_int($questionId) && ! is_string($questionId)) {
@@ -29,6 +31,10 @@ final readonly class InterviewQuestionReviewResult
             throw new InvalidArgumentException('Answer score must be numeric.');
         }
 
+        if (! is_numeric($adequacyScore)) {
+            throw new InvalidArgumentException('Adequacy score must be numeric.');
+        }
+
         if (! is_string($aiComment) || trim($aiComment) === '') {
             throw new InvalidArgumentException('AI comment is required.');
         }
@@ -36,6 +42,7 @@ final readonly class InterviewQuestionReviewResult
         return new self(
             interviewQuestionId: (int) $questionId,
             answerScore: max(1, min(10, round((float) $answerScore, 2))),
+            adequacyScore: max(1, min(10, round((float) $adequacyScore, 2))),
             aiComment: trim($aiComment),
         );
     }

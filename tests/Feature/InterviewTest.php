@@ -145,6 +145,41 @@ class InterviewTest extends TestCase
         $this->assertNull($interview->fresh()->score);
     }
 
+    public function test_interview_adequacy_score_is_recalculated_when_question_adequacy_scores_change(): void
+    {
+        $position = Position::factory()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 2,
+        ]);
+
+        $interview = Interview::factory()->create([
+            'position_id' => $position->id,
+        ]);
+
+        $snapshotQuestions = $interview->interviewQuestions()->orderBy('sort_order')->get();
+        $firstSnapshotQuestion = $snapshotQuestions[0];
+        $secondSnapshotQuestion = $snapshotQuestions[1];
+
+        $firstSnapshotQuestion->update(['adequacy_score' => 8.00]);
+        $secondSnapshotQuestion->update(['adequacy_score' => 10.00]);
+
+        $this->assertSame('9.00', $interview->fresh()->adequacy_score);
+
+        $secondSnapshotQuestion->update(['adequacy_score' => 6.00]);
+        $this->assertSame('7.00', $interview->fresh()->adequacy_score);
+
+        $firstSnapshotQuestion->update(['adequacy_score' => null]);
+        $this->assertSame('6.00', $interview->fresh()->adequacy_score);
+
+        $secondSnapshotQuestion->delete();
+        $this->assertNull($interview->fresh()->adequacy_score);
+    }
+
     public function test_interview_status_is_cast_to_enum(): void
     {
         $pendingInterview = Interview::factory()->create([
@@ -231,6 +266,7 @@ class InterviewTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Possible cheating events');
+        $response->assertSee($interviewQuestion->question_text);
     }
 
     public function test_integrity_event_type_has_human_readable_russian_labels(): void

@@ -24,7 +24,7 @@ class CreateInterview extends CreateRecord
                     ->schema([
                         Select::make('position_id')
                             ->label('Position')
-                            ->relationship('position', 'title')
+                            ->relationship('position', 'title', static fn ($query) => $query->withoutTrashed())
                             ->searchable()
                             ->preload()
                             ->required()
