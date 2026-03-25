@@ -3,9 +3,8 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "prepare:vad-assets": "mkdir -p public/vad && cp node_modules/@ricky0123/vad-web/dist/silero_vad_legacy.onnx public/vad/ && cp node_modules/onnxruntime-web/dist/*.wasm public/vad/ && cp node_modules/onnxruntime-web/dist/*.mjs public/vad/",
-        "build": "npm run prepare:vad-assets && vite build",
-        "dev": "npm run prepare:vad-assets && vite"
+        "build": "vite build",
+        "dev": "vite"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
@@ -16,7 +15,6 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
-        "@ricky0123/vad-web": "^0.0.30",
         "@vitejs/plugin-vue": "^6.0.4",
         "vue": "^3.5.30"
     }
