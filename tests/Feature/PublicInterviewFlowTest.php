@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\AI\Features\SpeechToText\Contracts\SpeechTranscriber;
 use App\Enums\InterviewStatus;
+use App\Jobs\TranscribeInterviewAudioJob;
 use App\Models\Interview;
 use App\Models\InterviewTelegramConfirmation;
 use App\Models\Position;
@@ -12,6 +12,7 @@ use App\Models\Question;
 use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -421,8 +422,10 @@ class PublicInterviewFlowTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_transcribe_endpoint_returns_text_from_stt_provider(): void
+    public function test_transcribe_endpoint_dispatches_job_and_returns_transcription_key(): void
     {
+        Queue::fake();
+
         $position = Position::factory()->public()->create();
         Question::factory()->create([
             'position_id' => $position->id,
@@ -435,20 +438,6 @@ class PublicInterviewFlowTest extends TestCase
             'telegram' => '@nora_hall',
         ]);
 
-        $fakeSpeechTranscriber = new class implements SpeechTranscriber
-        {
-            public string $language = '';
-
-            public function transcribe(UploadedFile $audioFile, string $language): string
-            {
-                $this->language = $language;
-
-                return 'Hello from OpenAI transcription.';
-            }
-        };
-
-        $this->app->instance(SpeechTranscriber::class, $fakeSpeechTranscriber);
-
         $response = $this->post(route('public-interviews.transcribe', ['interview' => $interview]), [
             'audio' => UploadedFile::fake()->create('speech.webm', 128, 'audio/webm'),
             'language' => 'auto',
@@ -456,11 +445,13 @@ class PublicInterviewFlowTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJson([
-                'text' => 'Hello from OpenAI transcription.',
-            ]);
+            ->assertJsonStructure(['transcription_key', 'status', 'status_url'])
+            ->assertJson(['status' => 'processing']);
 
-        $this->assertSame('auto', $fakeSpeechTranscriber->language);
+        Queue::assertPushed(TranscribeInterviewAudioJob::class, function (TranscribeInterviewAudioJob $job) use ($response): bool {
+            return $job->transcriptionKey === $response->json('transcription_key')
+                && $job->language === 'auto';
+        });
     }
 
     public function test_transcribe_endpoint_is_forbidden_without_active_public_interview_session(): void
@@ -522,19 +513,7 @@ class PublicInterviewFlowTest extends TestCase
             'candidate_answer' => null,
         ]);
 
-        $fakeSpeechTranscriber = new class implements SpeechTranscriber
-        {
-            public bool $wasCalled = false;
-
-            public function transcribe(UploadedFile $audioFile, string $language): string
-            {
-                $this->wasCalled = true;
-
-                return 'This should not be returned.';
-            }
-        };
-
-        $this->app->instance(SpeechTranscriber::class, $fakeSpeechTranscriber);
+        Queue::fake();
 
         $transcribeResponse = $this->withSession(['public_interview_id' => $interview->id])
             ->post(route('public-interviews.transcribe', ['interview' => $interview]), [
@@ -545,10 +524,11 @@ class PublicInterviewFlowTest extends TestCase
         $transcribeResponse
             ->assertOk()
             ->assertJson([
+                'status' => 'completed',
                 'text' => '',
             ]);
 
-        $this->assertFalse($fakeSpeechTranscriber->wasCalled);
+        Queue::assertNothingPushed();
     }
 
     public function test_feedback_endpoint_saves_candidate_rating_after_interview_completion(): void
@@ -1052,6 +1032,7 @@ class PublicInterviewFlowTest extends TestCase
         $startRoute = Route::getRoutes()->getByName('public-positions.start');
         $confirmationStatusRoute = Route::getRoutes()->getByName('public-positions.confirmation-status');
         $transcribeRoute = Route::getRoutes()->getByName('public-interviews.transcribe');
+        $transcriptionStatusRoute = Route::getRoutes()->getByName('public-interviews.transcription-status');
         $answerRoute = Route::getRoutes()->getByName('public-interviews.questions.answer');
         $feedbackRoute = Route::getRoutes()->getByName('public-interviews.feedback');
         $customQuestionRoute = Route::getRoutes()->getByName('public-interviews.custom-question');
@@ -1060,6 +1041,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->assertNotNull($startRoute);
         $this->assertNotNull($confirmationStatusRoute);
         $this->assertNotNull($transcribeRoute);
+        $this->assertNotNull($transcriptionStatusRoute);
         $this->assertNotNull($answerRoute);
         $this->assertNotNull($feedbackRoute);
         $this->assertNotNull($customQuestionRoute);
@@ -1068,6 +1050,7 @@ class PublicInterviewFlowTest extends TestCase
         $this->assertContains('throttle:public-position-start', $startRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-confirmation-status', $confirmationStatusRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-transcribe', $transcribeRoute->gatherMiddleware());
+        $this->assertContains('throttle:public-interview-transcription-status', $transcriptionStatusRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $answerRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $feedbackRoute->gatherMiddleware());
         $this->assertContains('throttle:public-interview-answer', $customQuestionRoute->gatherMiddleware());

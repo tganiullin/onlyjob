@@ -1,10 +1,7 @@
-import { NonRealTimeVAD } from '@ricky0123/vad-web';
-
-const DEFAULT_MIN_SPEECH_SECONDS = 0.5;
-const VAD_MODEL_URL = '/vad/silero_vad_legacy.onnx';
-const ORT_WASM_BASE_PATH = '/vad/';
-
-let nonRealTimeVadPromise = null;
+const DEFAULT_MIN_SPEECH_SECONDS = 0.15;
+const RMS_SILENCE_THRESHOLD = 0.005;
+const ACTIVE_FRAME_THRESHOLD = 0.007;
+const MIN_ACTIVE_RATIO = 0.02;
 
 export function sumSpeechDurationSeconds(segments) {
     if (!Array.isArray(segments)) {
@@ -34,80 +31,65 @@ function getAudioContextConstructor() {
     return window.AudioContext || window.webkitAudioContext || null;
 }
 
-function getAudioDurationSeconds(audioBuffer) {
-    const frameCount = Number(audioBuffer?.length) || 0;
-    const sampleRate = Number(audioBuffer?.sampleRate) || 0;
-
-    if (frameCount <= 0 || sampleRate <= 0) {
-        return 0;
+function analyzeEnergy(pcmData, sampleRate) {
+    if (!(pcmData instanceof Float32Array) || pcmData.length === 0 || sampleRate <= 0) {
+        return { rms: 0, activeRatio: 0, audioDurationSeconds: 0 };
     }
 
-    return frameCount / sampleRate;
+    const audioDurationSeconds = pcmData.length / sampleRate;
+    const frameSize = Math.floor(sampleRate * 0.03);
+    const frameCount = Math.floor(pcmData.length / frameSize);
+
+    if (frameCount === 0) {
+        return { rms: 0, activeRatio: 0, audioDurationSeconds };
+    }
+
+    let totalEnergy = 0;
+    let activeFrames = 0;
+
+    for (let f = 0; f < frameCount; f++) {
+        let frameEnergy = 0;
+        const offset = f * frameSize;
+        for (let i = 0; i < frameSize; i++) {
+            const sample = pcmData[offset + i];
+            frameEnergy += sample * sample;
+        }
+        const frameRms = Math.sqrt(frameEnergy / frameSize);
+        totalEnergy += frameEnergy;
+
+        if (frameRms > ACTIVE_FRAME_THRESHOLD) {
+            activeFrames++;
+        }
+    }
+
+    return {
+        rms: Math.sqrt(totalEnergy / pcmData.length),
+        activeRatio: activeFrames / frameCount,
+        audioDurationSeconds,
+    };
 }
 
-function mixToMono(audioBuffer) {
-    const channelCount = Number(audioBuffer?.numberOfChannels) || 0;
-    const frameCount = Number(audioBuffer?.length) || 0;
+function decodeToMono(decoded) {
+    const channelCount = decoded.numberOfChannels || 0;
+    const frameCount = decoded.length || 0;
 
     if (channelCount <= 0 || frameCount <= 0) {
         return new Float32Array();
     }
 
     if (channelCount === 1) {
-        const mono = audioBuffer.getChannelData(0);
-        return new Float32Array(mono);
+        return new Float32Array(decoded.getChannelData(0));
     }
 
-    const monoData = new Float32Array(frameCount);
-    for (let channel = 0; channel < channelCount; channel += 1) {
-        const channelData = audioBuffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i += 1) {
-            monoData[i] += channelData[i] / channelCount;
+    const mono = new Float32Array(frameCount);
+    for (let ch = 0; ch < channelCount; ch++) {
+        const data = decoded.getChannelData(ch);
+        for (let i = 0; i < frameCount; i++) {
+            mono[i] += data[i] / channelCount;
         }
     }
 
-    return monoData;
-}
-
-async function decodeBlobToMonoPcm(audioBlob) {
-    const AudioContextCtor = getAudioContextConstructor();
-    if (!AudioContextCtor) {
-        throw new Error('AudioContext is not supported.');
-    }
-
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioContext = new AudioContextCtor();
-
-    try {
-        const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        return {
-            monoPcm: mixToMono(decodedBuffer),
-            sampleRate: decodedBuffer.sampleRate,
-            audioDurationSeconds: getAudioDurationSeconds(decodedBuffer),
-        };
-    } finally {
-        await audioContext.close().catch(() => {});
-    }
-}
-
-async function getNonRealTimeVad() {
-    if (!nonRealTimeVadPromise) {
-        nonRealTimeVadPromise = NonRealTimeVAD.new({
-            minSpeechMs: 500,
-            modelURL: VAD_MODEL_URL,
-            ortConfig: (ort) => {
-                ort.env.wasm.wasmPaths = ORT_WASM_BASE_PATH;
-                ort.env.logLevel = 'error';
-            },
-        });
-    }
-
-    return nonRealTimeVadPromise;
-}
-
-function normalizeErrorReason(error) {
-    const message = error instanceof Error ? error.message : '';
-    return message === '' ? 'vad_error' : `vad_error:${message}`;
+    return mono;
 }
 
 export function useFrontendVad() {
@@ -123,41 +105,57 @@ export function useFrontendVad() {
             };
         }
 
-        try {
-            const { monoPcm, sampleRate, audioDurationSeconds } = await decodeBlobToMonoPcm(audioBlob);
+        const AudioContextCtor = getAudioContextConstructor();
+        if (!AudioContextCtor) {
+            return { hasSpeech: true, reason: null, speechSeconds: 0, audioDurationSeconds: 0 };
+        }
 
-            if (!(monoPcm instanceof Float32Array) || monoPcm.length === 0 || !Number.isFinite(sampleRate)) {
+        let audioContext = null;
+
+        try {
+            let arrayBuffer = await audioBlob.arrayBuffer();
+            audioContext = new AudioContextCtor();
+            const decoded = await audioContext.decodeAudioData(arrayBuffer);
+            arrayBuffer = null;
+
+            const sampleRate = decoded.sampleRate;
+            const mono = decodeToMono(decoded);
+
+            const { rms, activeRatio, audioDurationSeconds } = analyzeEnergy(mono, sampleRate);
+
+            if (rms < RMS_SILENCE_THRESHOLD) {
                 return {
                     hasSpeech: false,
-                    reason: 'audio_decode_empty',
+                    reason: 'below_rms_threshold',
                     speechSeconds: 0,
                     audioDurationSeconds,
                 };
             }
 
-            const detector = await getNonRealTimeVad();
-            const speechSegments = [];
-
-            for await (const segment of detector.run(monoPcm, sampleRate)) {
-                speechSegments.push(segment);
+            if (activeRatio < MIN_ACTIVE_RATIO) {
+                return {
+                    hasSpeech: false,
+                    reason: 'below_min_speech_threshold',
+                    speechSeconds: 0,
+                    audioDurationSeconds,
+                };
             }
 
-            const speechSeconds = sumSpeechDurationSeconds(speechSegments);
-            const hasSpeech = shouldTreatAsSpeech(speechSeconds, minSpeechSeconds);
+            const estimatedSpeechSeconds = audioDurationSeconds * activeRatio;
+            const hasSpeech = shouldTreatAsSpeech(estimatedSpeechSeconds, minSpeechSeconds);
 
             return {
                 hasSpeech,
                 reason: hasSpeech ? null : 'below_min_speech_threshold',
-                speechSeconds,
+                speechSeconds: estimatedSpeechSeconds,
                 audioDurationSeconds,
             };
-        } catch (error) {
-            return {
-                hasSpeech: false,
-                reason: normalizeErrorReason(error),
-                speechSeconds: 0,
-                audioDurationSeconds: 0,
-            };
+        } catch {
+            return { hasSpeech: true, reason: 'decode_error_pass_through', speechSeconds: 0, audioDurationSeconds: 0 };
+        } finally {
+            if (audioContext) {
+                await audioContext.close().catch(() => {});
+            }
         }
     };
 

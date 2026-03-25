@@ -28,6 +28,9 @@ Route::prefix('public/interviews')->name('public-interviews.')->group(function (
     Route::post('{interview}/transcribe', [PublicInterviewRunController::class, 'transcribe'])
         ->middleware('throttle:public-interview-transcribe')
         ->name('transcribe');
+    Route::get('{interview}/transcriptions/{key}', [PublicInterviewRunController::class, 'transcriptionStatus'])
+        ->middleware('throttle:public-interview-transcription-status')
+        ->name('transcription-status');
     Route::post('{interview}/questions/{interviewQuestion}', [PublicInterviewRunController::class, 'answer'])
         ->middleware('throttle:public-interview-answer')
         ->name('questions.answer');

@@ -97,6 +97,7 @@ const {
     ensureMicrophoneAccess,
     startRecording,
     stopRecording,
+    releaseStream,
 } = useRecording();
 
 const isRecordingPhrase = computed(() => recordingMode.value === 'phrase');
@@ -451,6 +452,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     clearRecordHintTimer();
+    releaseStream();
     document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
 });
 </script>
