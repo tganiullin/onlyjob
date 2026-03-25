@@ -14,7 +14,6 @@ use App\Models\InterviewIntegrityEvent;
 use App\Models\InterviewQuestion;
 use App\Models\Position;
 use App\Models\PositionCompanyQuestion;
-use App\Services\FollowUpService;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -32,13 +31,11 @@ class PublicInterviewRunController extends Controller
 
         $questions = $interview->interviewQuestions()
             ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get(['id', 'question_text', 'candidate_answer', 'is_follow_up'])
+            ->get(['id', 'question_text', 'candidate_answer'])
             ->map(static fn (InterviewQuestion $question): array => [
                 'id' => $question->id,
                 'text' => $question->question_text,
                 'candidate_answer' => $question->candidate_answer,
-                'is_follow_up' => (bool) $question->is_follow_up,
             ])
             ->all();
 
@@ -117,20 +114,6 @@ class PublicInterviewRunController extends Controller
         ])->save();
 
         $this->markInterviewAsInProgress($interview);
-
-        $followUpQuestion = app(FollowUpService::class)
-            ->evaluateAndCreateFollowUp($interview, $expectedQuestion);
-
-        if ($followUpQuestion instanceof InterviewQuestion) {
-            return response()->json([
-                'completed' => false,
-                'next_question' => [
-                    'id' => $followUpQuestion->id,
-                    'text' => $followUpQuestion->question_text,
-                    'is_follow_up' => true,
-                ],
-            ]);
-        }
 
         $nextQuestion = $this->resolveExpectedQuestion($interview);
 

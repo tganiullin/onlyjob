@@ -36,13 +36,4 @@ class PositionFactory extends Factory
             'public_token' => Str::random(40),
         ]);
     }
-
-    public function withFollowUp(float $scoreThreshold = 4.00, int $maxPerQuestion = 1): static
-    {
-        return $this->state(fn (): array => [
-            'follow_up_enabled' => true,
-            'follow_up_score_threshold' => $scoreThreshold,
-            'max_follow_ups_per_question' => $maxPerQuestion,
-        ]);
-    }
 }
