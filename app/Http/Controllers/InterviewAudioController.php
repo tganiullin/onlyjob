@@ -30,7 +30,7 @@ class InterviewAudioController extends Controller
             );
         }
 
-        return $disk->response($path, null, [
+        return response()->file($disk->path($path), [
             'Content-Type' => $this->resolveAudioMimeType($path),
         ]);
     }

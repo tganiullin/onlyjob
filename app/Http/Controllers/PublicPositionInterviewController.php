@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InterviewStatus;
 use App\Http\Requests\StartPublicInterviewRequest;
 use App\Models\Interview;
 use App\Models\Position;
@@ -33,6 +34,10 @@ class PublicPositionInterviewController extends Controller
         }
 
         $validated = $request->validated();
+
+        if (! config('telegram.confirmation_required')) {
+            return $this->startWithoutTelegramConfirmation($request, $position, $validated);
+        }
 
         $sessionFingerprint = $this->telegramAccountConfirmationService->resolveSessionFingerprint(
             (string) $request->ip(),
@@ -73,6 +78,38 @@ class PublicPositionInterviewController extends Controller
         return redirect()
             ->route('public-positions.show', ['token' => $position->public_token])
             ->with('pending_confirmation', $responsePayload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function startWithoutTelegramConfirmation(
+        StartPublicInterviewRequest $request,
+        Position $position,
+        array $validated,
+    ): RedirectResponse|JsonResponse {
+        $interview = Interview::query()->create([
+            'position_id' => $position->id,
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'email' => $validated['email'] ?? null,
+            'telegram' => $validated['telegram'],
+            'status' => InterviewStatus::PendingInterview,
+        ]);
+
+        $request->session()->put('public_interview_id', $interview->id);
+        $request->session()->forget('public_pending_confirmation_status_token');
+
+        $redirect = route('public-interviews.run', ['interview' => $interview]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'confirmed',
+                'redirect' => $redirect,
+            ]);
+        }
+
+        return redirect()->to($redirect);
     }
 
     public function confirmationStatus(Request $request, string $token, string $statusToken): JsonResponse
