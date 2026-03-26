@@ -5,9 +5,13 @@ namespace App\Filament\Widgets;
 use App\Enums\InterviewStatus;
 use App\Models\Interview;
 use Filament\Widgets\ChartWidget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Illuminate\Database\Eloquent\Builder;
 
 class InterviewStatusChart extends ChartWidget
 {
+    use InteractsWithPageFilters;
+
     protected static ?int $sort = 3;
 
     protected ?string $heading = 'Распределение по статусам';
@@ -18,7 +22,14 @@ class InterviewStatusChart extends ChartWidget
 
     protected function getData(): array
     {
+        $startDate = $this->pageFilters['startDate'] ?? null;
+        $endDate = $this->pageFilters['endDate'] ?? null;
+        $positionId = $this->pageFilters['position_id'] ?? null;
+
         $counts = Interview::query()
+            ->when($startDate, fn (Builder $query) => $query->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn (Builder $query) => $query->whereDate('created_at', '<=', $endDate))
+            ->when($positionId, fn (Builder $query) => $query->where('position_id', $positionId))
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status');

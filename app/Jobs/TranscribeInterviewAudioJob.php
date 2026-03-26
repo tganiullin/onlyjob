@@ -29,7 +29,9 @@ class TranscribeInterviewAudioJob implements ShouldQueue
         public int $interviewId,
         public string $language,
         public ?int $interviewQuestionId = null,
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     public function handle(SpeechTranscriber $speechTranscriber): void
     {

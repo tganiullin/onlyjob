@@ -4,9 +4,13 @@ namespace App\Filament\Widgets;
 
 use App\Models\Interview;
 use Filament\Widgets\ChartWidget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Illuminate\Database\Eloquent\Builder;
 
 class InterviewsByPositionChart extends ChartWidget
 {
+    use InteractsWithPageFilters;
+
     protected static ?int $sort = 4;
 
     protected ?string $heading = 'Интервью по позициям (топ-10)';
@@ -15,9 +19,16 @@ class InterviewsByPositionChart extends ChartWidget
 
     protected function getData(): array
     {
+        $startDate = $this->pageFilters['startDate'] ?? null;
+        $endDate = $this->pageFilters['endDate'] ?? null;
+        $positionId = $this->pageFilters['position_id'] ?? null;
+
         $positions = Interview::query()
             ->join('positions', 'interviews.position_id', '=', 'positions.id')
             ->whereNull('positions.deleted_at')
+            ->when($startDate, fn (Builder $query) => $query->whereDate('interviews.created_at', '>=', $startDate))
+            ->when($endDate, fn (Builder $query) => $query->whereDate('interviews.created_at', '<=', $endDate))
+            ->when($positionId, fn (Builder $query) => $query->where('interviews.position_id', $positionId))
             ->selectRaw('positions.title, COUNT(*) as count')
             ->groupBy('positions.id', 'positions.title')
             ->orderByDesc('count')
