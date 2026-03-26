@@ -87,12 +87,6 @@ class AppServiceProvider extends ServiceProvider
             ));
         });
 
-        RateLimiter::for('telegram-webhook', function (Request $request): Limit {
-            return Limit::perMinute(30)->by(sprintf(
-                'telegram-webhook:%s',
-                (string) $request->ip(),
-            ));
-        });
     }
 
     private function resolveRouteSegmentKey(Request $request, string $segment): string
