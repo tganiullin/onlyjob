@@ -285,7 +285,7 @@ class PublicInterviewRunController extends Controller
             abort(404);
         }
 
-        if ($interview->telegram_confirmed_at === null) {
+        if (config('telegram.confirmation_required') && $interview->telegram_confirmed_at === null) {
             abort(403);
         }
     }

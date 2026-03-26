@@ -18,14 +18,14 @@ enum PositionAnswerTime: int implements HasLabel
     public function getLabel(): ?string
     {
         return match ($this) {
-            self::OneMinute => '1 min',
-            self::OneMinuteThirtySeconds => '1 min 30 sec',
-            self::TwoMinutes => '2 min',
-            self::TwoMinutesThirtySeconds => '2 min 30 sec',
-            self::ThreeMinutes => '3 min',
-            self::ThreeMinutesThirtySeconds => '3 min 30 sec',
-            self::FourMinutes => '4 min',
-            self::FiveMinutes => '5 min',
+            self::OneMinute => '1 мин',
+            self::OneMinuteThirtySeconds => '1 мин 30 сек',
+            self::TwoMinutes => '2 мин',
+            self::TwoMinutesThirtySeconds => '2 мин 30 сек',
+            self::ThreeMinutes => '3 мин',
+            self::ThreeMinutesThirtySeconds => '3 мин 30 сек',
+            self::FourMinutes => '4 мин',
+            self::FiveMinutes => '5 мин',
         };
     }
 }

@@ -9,6 +9,7 @@ use App\Models\Position;
 use App\Models\Question;
 use App\Services\InterviewReviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\Fakes\FakeAiProvider;
 use Tests\TestCase;
 
@@ -142,6 +143,100 @@ class CheckInterviewJobTest extends TestCase
             'status' => InterviewStatus::ReviewedFailed->value,
             'score' => '6.50',
             'adequacy_score' => '4.25',
+        ]);
+    }
+
+    public function test_failed_method_sets_review_failed_status(): void
+    {
+        $interview = $this->createInterviewWithAnswers(
+            minimumScore: 7,
+            status: InterviewStatus::Reviewing,
+        );
+
+        $job = new CheckInterviewJob($interview->id);
+        $job->failed(new RuntimeException('AI provider timeout'));
+
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'status' => InterviewStatus::ReviewFailed->value,
+        ]);
+    }
+
+    public function test_failed_method_does_not_overwrite_non_reviewing_status(): void
+    {
+        $interview = $this->createInterviewWithAnswers(
+            minimumScore: 7,
+            status: InterviewStatus::ReviewedPassed,
+        );
+
+        $job = new CheckInterviewJob($interview->id);
+        $job->failed(new RuntimeException('AI provider timeout'));
+
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'status' => InterviewStatus::ReviewedPassed->value,
+        ]);
+    }
+
+    public function test_job_keeps_reviewing_status_on_exception_for_retry(): void
+    {
+        $interview = $this->createInterviewWithAnswers(
+            minimumScore: 7,
+            status: InterviewStatus::Completed,
+        );
+
+        $this->useFakeAiProvider(new FakeAiProvider([]));
+
+        try {
+            (new CheckInterviewJob($interview->id))->handle(app(InterviewReviewService::class));
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'status' => InterviewStatus::Reviewing->value,
+        ]);
+    }
+
+    public function test_job_processes_interview_in_reviewing_status_on_retry(): void
+    {
+        $interview = $this->createInterviewWithAnswers(
+            minimumScore: 7,
+            status: InterviewStatus::Reviewing,
+        );
+
+        $questions = $interview->interviewQuestions()->orderBy('sort_order')->get();
+
+        $provider = new FakeAiProvider([
+            [
+                'summary' => 'Retry succeeded.',
+                'questions' => [
+                    [
+                        'interview_question_id' => $questions[0]->id,
+                        'answer_score' => 8.0,
+                        'adequacy_score' => 9.0,
+                        'ai_comment' => 'Good answer.',
+                    ],
+                    [
+                        'interview_question_id' => $questions[1]->id,
+                        'answer_score' => 8.0,
+                        'adequacy_score' => 9.0,
+                        'ai_comment' => 'Good answer.',
+                    ],
+                ],
+            ],
+        ]);
+        $this->useFakeAiProvider($provider);
+
+        (new CheckInterviewJob($interview->id))->handle(app(InterviewReviewService::class));
+
+        $this->assertSame(1, $provider->callCount);
+        $this->assertDatabaseHas('interviews', [
+            'id' => $interview->id,
+            'status' => InterviewStatus::ReviewedPassed->value,
+            'summary' => 'Retry succeeded.',
         ]);
     }
 

@@ -71,6 +71,7 @@ return [
     */
     'bot_username' => env('TELEGRAM_BOT_USERNAME'),
     'webhook_secret_token' => env('TELEGRAM_WEBHOOK_SECRET_TOKEN'),
+    'confirmation_required' => (bool) env('TELEGRAM_CONFIRMATION_REQUIRED', true),
     'confirmation_ttl_seconds' => (int) env('TELEGRAM_CONFIRM_TTL_SECONDS', 900),
 
     /*
