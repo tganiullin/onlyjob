@@ -22,16 +22,24 @@ class InterviewAudioController extends Controller
             abort(404);
         }
 
-        $driver = (string) config('filesystems.disks.'.config('filesystems.default').'.driver');
+        $mimeType = $this->resolveAudioMimeType($path);
 
-        if ($driver === 's3') {
-            return redirect()->to(
-                $disk->temporaryUrl($path, now()->addMinutes(5)),
-            );
+        if (method_exists($disk, 'path') && file_exists($disk->path($path))) {
+            return response()->file($disk->path($path), [
+                'Content-Type' => $mimeType,
+            ]);
         }
 
-        return response()->file($disk->path($path), [
-            'Content-Type' => $this->resolveAudioMimeType($path),
+        return response()->stream(function () use ($disk, $path): void {
+            $stream = $disk->readStream($path);
+
+            if ($stream !== null) {
+                fpassthru($stream);
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => $disk->size($path),
         ]);
     }
 

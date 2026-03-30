@@ -1,15 +1,36 @@
 @php
     $audioPath = $get('candidate_answer_audio_path');
     $questionId = $get('id');
+    $audioUrl = null;
+    $mimeType = 'audio/webm';
+
+    if (filled($audioPath) && filled($questionId)) {
+        $disk = \Illuminate\Support\Facades\Storage::disk();
+
+        if ($disk->providesTemporaryUrls() && $disk->exists($audioPath)) {
+            $audioUrl = $disk->temporaryUrl($audioPath, now()->addMinutes(30));
+        } else {
+            $audioUrl = route('interview-audio.stream', ['interviewQuestion' => $questionId]);
+        }
+
+        $ext = strtolower(pathinfo($audioPath, PATHINFO_EXTENSION));
+        $mimeType = match ($ext) {
+            'ogg' => 'audio/ogg',
+            'wav' => 'audio/wav',
+            'm4a' => 'audio/mp4',
+            'mp3' => 'audio/mpeg',
+            default => 'audio/webm',
+        };
+    }
 @endphp
 
-@if (filled($audioPath) && filled($questionId))
+@if ($audioUrl)
     <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
         <p class="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">
             Аудиозапись ответа
         </p>
         <audio controls preload="metadata" class="w-full">
-            <source src="{{ route('interview-audio.stream', ['interviewQuestion' => $questionId]) }}" type="audio/webm">
+            <source src="{{ $audioUrl }}" type="{{ $mimeType }}">
         </audio>
     </div>
 @endif
