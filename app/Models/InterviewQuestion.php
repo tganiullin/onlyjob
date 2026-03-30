@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InterviewQuestion extends Model
 {
@@ -17,6 +18,7 @@ class InterviewQuestion extends Model
     protected $fillable = [
         'interview_id',
         'question_id',
+        'parent_question_id',
         'question_text',
         'evaluation_instructions_snapshot',
         'sort_order',
@@ -35,6 +37,7 @@ class InterviewQuestion extends Model
         return [
             'interview_id' => 'integer',
             'question_id' => 'integer',
+            'parent_question_id' => 'integer',
             'sort_order' => 'integer',
             'answer_score' => 'decimal:2',
             'adequacy_score' => 'decimal:2',
@@ -74,5 +77,25 @@ class InterviewQuestion extends Model
     public function question(): BelongsTo
     {
         return $this->belongsTo(Question::class);
+    }
+
+    public function parentQuestion(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_question_id');
+    }
+
+    public function followUps(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_question_id')->orderBy('id');
+    }
+
+    public function isFollowUp(): bool
+    {
+        return $this->parent_question_id !== null;
+    }
+
+    public function resolveRootQuestionId(): int
+    {
+        return $this->parent_question_id ?? $this->id;
     }
 }

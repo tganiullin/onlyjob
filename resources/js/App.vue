@@ -26,12 +26,13 @@ const props = defineProps({
     initialCandidateCustomQuestion: { type: String, default: '' },
 });
 
-const questions = computed(() => Array.isArray(props.questions) ? props.questions : []);
+const questions = ref(Array.isArray(props.questions) ? [...props.questions] : []);
 
 const firstUnansweredIndex = computed(() =>
     questions.value.findIndex((q) => !(typeof q?.candidate_answer === 'string' && q.candidate_answer.trim() !== '')),
 );
 const allAnswered = computed(() => questions.value.length > 0 && firstUnansweredIndex.value === -1);
+const mainQuestionsCount = computed(() => questions.value.filter((q) => !q.is_follow_up).length);
 
 const completed = ref(props.interviewCompleted || allAnswered.value);
 const currentIndex = ref(
@@ -78,6 +79,7 @@ const customQuestion = ref(
 const customQuestionSubmitting = ref(false);
 const customQuestionStatus = ref('');
 const customQuestionStatusError = ref(false);
+const followUpPending = ref(false);
 
 const api = useInterviewApi({
     transcribeEndpoint: props.transcribeEndpoint,
@@ -273,6 +275,81 @@ function handleInstructionsStart() {
     );
 }
 
+function advanceToNextQuestion(payload) {
+    if (payload.completed === true) {
+        completed.value = true;
+        currentIndex.value = questions.value.length;
+        answerStatus.value =
+            typeof payload.message === 'string' && payload.message.trim() !== ''
+                ? payload.message.trim()
+                : props.completionMessage;
+        return;
+    }
+
+    if (payload.next_question?.id) {
+        const nextQ = payload.next_question;
+        let nextIdx = questions.value.findIndex((q) => Number(q.id) === Number(nextQ.id));
+
+        if (nextIdx < 0) {
+            questions.value.splice(currentIndex.value + 1, 0, {
+                id: nextQ.id,
+                text: nextQ.text,
+                candidate_answer: null,
+                is_follow_up: nextQ.is_follow_up ?? false,
+            });
+            nextIdx = currentIndex.value + 1;
+        }
+
+        currentIndex.value = nextIdx;
+    } else {
+        currentIndex.value += 1;
+    }
+
+    answerStatus.value = '';
+    startTimer(
+        () => {},
+        () => {
+            answerStatus.value = 'Время на вопрос истекло. Запишите ответ или выберите "Не знаю ответ".';
+            answerStatusError.value = true;
+        },
+    );
+}
+
+async function handleFollowUpCheck(statusUrl) {
+    followUpPending.value = true;
+    answerStatus.value = '';
+
+    try {
+        const result = await api.pollFollowUp(statusUrl);
+
+        if (result.needs_follow_up && result.follow_up) {
+            const fu = result.follow_up;
+            questions.value.splice(currentIndex.value + 1, 0, {
+                id: fu.id,
+                text: fu.question_text,
+                candidate_answer: null,
+                is_follow_up: true,
+            });
+            currentIndex.value += 1;
+            answerStatus.value = '';
+            startTimer(
+                () => {},
+                () => {
+                    answerStatus.value = 'Время на вопрос истекло. Запишите ответ или выберите "Не знаю ответ".';
+                    answerStatusError.value = true;
+                },
+            );
+            return;
+        }
+
+        advanceToNextQuestion(result);
+    } catch {
+        advanceToNextQuestion({});
+    } finally {
+        followUpPending.value = false;
+    }
+}
+
 async function submitAnswer(candidateAnswer) {
     const question = questions.value[currentIndex.value];
     if (!question || submitting.value) return;
@@ -286,31 +363,16 @@ async function submitAnswer(candidateAnswer) {
         const payload = await api.submitAnswer(question.id, candidateAnswer);
         submittedAnswers[question.id] = candidateAnswer;
 
-        if (payload.completed === true) {
-            completed.value = true;
-            currentIndex.value = questions.value.length;
-            answerStatus.value =
-                typeof payload.message === 'string' && payload.message.trim() !== ''
-                    ? payload.message.trim()
-                    : props.completionMessage;
+        if (payload.follow_up_check?.status_url) {
+            submitting.value = false;
+            if (candidateAnswer === 'Не знаю ответ') {
+                skipSubmitting.value = false;
+            }
+            await handleFollowUpCheck(payload.follow_up_check.status_url);
             return;
         }
 
-        if (payload.next_question?.id) {
-            const nextIdx = questions.value.findIndex((q) => Number(q.id) === Number(payload.next_question.id));
-            currentIndex.value = nextIdx >= 0 ? nextIdx : currentIndex.value + 1;
-        } else {
-            currentIndex.value += 1;
-        }
-
-        answerStatus.value = 'Ответ сохранен.';
-        startTimer(
-            () => {},
-            () => {
-                answerStatus.value = 'Время на вопрос истекло. Запишите ответ или выберите "Не знаю ответ".';
-                answerStatusError.value = true;
-            },
-        );
+        advanceToNextQuestion(payload);
     } catch (err) {
         answerStatus.value = err instanceof Error ? err.message : 'Ошибка сети при сохранении ответа.';
         answerStatusError.value = true;
@@ -485,7 +547,7 @@ onUnmounted(() => {
                     :first-name="firstName"
                     :last-name="lastName"
                     :position-title="positionTitle"
-                    :questions-count="questions.length"
+                    :questions-count="mainQuestionsCount"
                     :answer-time-seconds="answerTimeSeconds"
                     @start="handleStartFlow"
                 />
@@ -527,6 +589,8 @@ onUnmounted(() => {
                     :custom-question-submitting="customQuestionSubmitting"
                     :custom-question-status="customQuestionStatus"
                     :custom-question-status-error="customQuestionStatusError"
+                    :follow-up-pending="followUpPending"
+                    :main-questions-count="mainQuestionsCount"
                     @request-microphone="handleRequestMicrophone"
                     @toggle-phrase-record="handleTogglePhraseRecord"
                     @continue="handleChatContinue"

@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\AI\Features\CompanyQuestionsGeneration\AiCompanyQuestionsGenerator;
 use App\AI\Features\CompanyQuestionsGeneration\Contracts\CompanyQuestionsGenerator;
+use App\AI\Features\FollowUpGeneration\AiFollowUpGenerator;
+use App\AI\Features\FollowUpGeneration\Contracts\FollowUpGenerator;
 use App\AI\Features\InterviewReview\AiInterviewReviewer;
 use App\AI\Features\InterviewReview\Contracts\InterviewReviewer;
 use App\AI\Features\QuestionGeneration\AiQuestionGenerator;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(InterviewReviewer::class, AiInterviewReviewer::class);
+        $this->app->bind(FollowUpGenerator::class, AiFollowUpGenerator::class);
         $this->app->bind(CompanyQuestionsGenerator::class, AiCompanyQuestionsGenerator::class);
         $this->app->bind(QuestionGenerator::class, AiQuestionGenerator::class);
         $this->app->bind(VoiceActivityDetector::class, FfmpegVoiceActivityDetector::class);
@@ -74,6 +77,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public-interview-transcription-status', function (Request $request): Limit {
             return Limit::perMinute(60)->by(sprintf(
                 'public-interview-transcription-status:%s:%s',
+                (string) $request->ip(),
+                $this->resolveRouteSegmentKey($request, 'interview'),
+            ));
+        });
+
+        RateLimiter::for('public-interview-follow-up-status', function (Request $request): Limit {
+            return Limit::perMinute(60)->by(sprintf(
+                'public-interview-follow-up-status:%s:%s',
                 (string) $request->ip(),
                 $this->resolveRouteSegmentKey($request, 'interview'),
             ));
