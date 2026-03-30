@@ -12,6 +12,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - php - 8.5.3
 - filament/filament (FILAMENT) - v5
 - laravel/framework (LARAVEL) - v12
+- laravel/nightwatch (NIGHTWATCH) - v1
 - laravel/octane (OCTANE) - v2
 - laravel/prompts (PROMPTS) - v0
 - laravel/sanctum (SANCTUM) - v4
