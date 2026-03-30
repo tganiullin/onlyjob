@@ -190,5 +190,28 @@ export function useInterviewApi(config) {
         });
     };
 
-    return { transcribe, submitAnswer, submitFeedback, submitCustomQuestion, submitIntegritySignal };
+    const pollFollowUp = async (statusUrl) => {
+        for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+            await sleep(POLL_INTERVAL_MS);
+
+            const pollRes = await fetch(statusUrl, {
+                method: 'GET',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+            });
+
+            const pollPayload = await pollRes.json().catch(() => null);
+
+            if (!pollRes.ok && pollRes.status !== 404) {
+                return { status: 'failed', needs_follow_up: false };
+            }
+
+            if (pollPayload?.status === 'completed' || pollPayload?.status === 'failed') {
+                return pollPayload;
+            }
+        }
+
+        return { status: 'failed', needs_follow_up: false };
+    };
+
+    return { transcribe, submitAnswer, submitFeedback, submitCustomQuestion, submitIntegritySignal, pollFollowUp };
 }

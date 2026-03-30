@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Laravel\Facades\Telegram;
+use Throwable;
 
 class TelegramWebhookController extends Controller
 {
@@ -79,7 +81,14 @@ class TelegramWebhookController extends Controller
             ]);
         }
 
-        Telegram::commandsHandler(true);
+        try {
+            Telegram::commandsHandler(true);
+        } catch (Throwable $e) {
+            Log::warning('Telegram commandsHandler failed', [
+                'exception' => $e->getMessage(),
+                'update_id' => $updatePayload['update_id'] ?? null,
+            ]);
+        }
 
         return response()->json([
             'ok' => true,

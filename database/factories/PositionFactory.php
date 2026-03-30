@@ -29,6 +29,15 @@ class PositionFactory extends Factory
         ];
     }
 
+    public function withFollowUp(int $maxPerQuestion = 1, ?int $minScore = null): static
+    {
+        return $this->state(fn (): array => [
+            'follow_up_enabled' => true,
+            'max_follow_ups_per_question' => $maxPerQuestion,
+            'follow_up_min_score' => $minScore,
+        ]);
+    }
+
     public function public(): static
     {
         return $this->state(fn (): array => [

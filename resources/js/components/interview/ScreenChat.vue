@@ -30,6 +30,8 @@ const props = defineProps({
     highlightRecordButton: { type: Boolean, default: false },
     recordingSupported: { type: Boolean, default: true },
     feedbackRating: { type: Number, default: null },
+    followUpPending: { type: Boolean, default: false },
+    mainQuestionsCount: { type: Number, default: 0 },
     feedbackSubmitting: { type: Boolean, default: false },
     feedbackStatus: { type: String, default: '' },
     feedbackStatusError: { type: Boolean, default: false },
@@ -367,6 +369,7 @@ onUnmounted(() => {
                         v-if="!interviewCompleted && index === currentQuestionIndex"
                         class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
                     >
+                        <p v-if="question.is_follow_up" class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-brand)]">Уточняющий вопрос</p>
                         <p class="text-base font-medium leading-relaxed">{{ question.text }}</p>
                         <p class="mt-4 text-center text-2xl font-medium text-[#2c3150]">{{ formatTimer(remainingSeconds) }}</p>
                     </div>
@@ -374,6 +377,7 @@ onUnmounted(() => {
                         v-else
                         class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-4 shadow-[0_10px_32px_rgba(93,103,166,0.12)]"
                     >
+                        <p v-if="question.is_follow_up" class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#a0a5c0]">Уточняющий вопрос</p>
                         <p class="text-base font-medium leading-relaxed text-[#6a6f8a]">{{ question.text }}</p>
                         <p class="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-[#289a5f]">
                             <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -384,6 +388,29 @@ onUnmounted(() => {
                     </div>
                 </div>
             </div>
+
+            <!-- Typing indicator: AI обдумывает follow-up -->
+            <Transition name="chat-message">
+                <div
+                    v-if="interviewStarted && !interviewCompleted && followUpPending"
+                    class="flex items-start gap-3"
+                >
+                    <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                        style="background-color: var(--color-brand);"
+                        aria-hidden="true"
+                    >
+                        L
+                    </div>
+                    <div class="chat-bubble rounded-2xl rounded-tl-md bg-white px-6 py-4 shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                        <div class="flex items-center gap-1.5">
+                            <span class="inline-block h-2 w-2 animate-bounce rounded-full bg-[#b4b8cc] [animation-delay:0ms]"></span>
+                            <span class="inline-block h-2 w-2 animate-bounce rounded-full bg-[#b4b8cc] [animation-delay:150ms]"></span>
+                            <span class="inline-block h-2 w-2 animate-bounce rounded-full bg-[#b4b8cc] [animation-delay:300ms]"></span>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
 
             <!-- Сообщение о завершении интервью -->
             <div
@@ -590,9 +617,9 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- Панель записи ответа (только в фазе интервью, до завершения) -->
+        <!-- Панель записи ответа (только в фазе интервью, до завершения, не во время follow-up polling) -->
         <div
-            v-show="interviewStarted && !interviewCompleted"
+            v-show="interviewStarted && !interviewCompleted && !followUpPending"
             class="fixed inset-x-0 bottom-8 z-20 py-4 backdrop-blur-[4px]"
         >
             <div class="mx-auto flex max-w-[1080px] flex-col items-center justify-center gap-4 px-10">

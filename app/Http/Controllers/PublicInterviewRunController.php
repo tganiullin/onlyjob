@@ -8,6 +8,7 @@ use App\Http\Requests\StorePublicInterviewCustomQuestionRequest;
 use App\Http\Requests\StorePublicInterviewFeedbackRequest;
 use App\Http\Requests\StorePublicInterviewIntegritySignalRequest;
 use App\Http\Requests\TranscribePublicInterviewAudioRequest;
+use App\Jobs\GenerateFollowUpJob;
 use App\Jobs\TranscribeInterviewAudioJob;
 use App\Models\Interview;
 use App\Models\InterviewIntegrityEvent;
@@ -33,11 +34,13 @@ class PublicInterviewRunController extends Controller
 
         $questions = $interview->interviewQuestions()
             ->orderBy('sort_order')
-            ->get(['id', 'question_text', 'candidate_answer'])
+            ->orderBy('id')
+            ->get(['id', 'question_text', 'candidate_answer', 'parent_question_id'])
             ->map(static fn (InterviewQuestion $question): array => [
                 'id' => $question->id,
                 'text' => $question->question_text,
                 'candidate_answer' => $question->candidate_answer,
+                'is_follow_up' => $question->parent_question_id !== null,
             ])
             ->all();
 
@@ -111,30 +114,36 @@ class PublicInterviewRunController extends Controller
             ], 409);
         }
 
+        $candidateAnswer = $request->validated('candidate_answer');
+
         $expectedQuestion->forceFill([
-            'candidate_answer' => $request->validated('candidate_answer'),
+            'candidate_answer' => $candidateAnswer,
         ])->save();
 
         $this->markInterviewAsInProgress($interview);
 
-        $nextQuestion = $this->resolveExpectedQuestion($interview);
+        $interview->loadMissing('position');
 
-        if ($nextQuestion instanceof InterviewQuestion) {
+        if ($this->shouldCheckFollowUp($interview, $candidateAnswer)) {
+            $followUpKey = Str::uuid()->toString();
+
+            Cache::put("follow_up:{$followUpKey}", ['status' => 'processing'], now()->addMinutes(10));
+
+            GenerateFollowUpJob::dispatch($expectedQuestion->resolveRootQuestionId(), $followUpKey);
+
             return response()->json([
                 'completed' => false,
-                'next_question' => [
-                    'id' => $nextQuestion->id,
-                    'text' => $nextQuestion->question_text,
+                'follow_up_check' => [
+                    'key' => $followUpKey,
+                    'status_url' => route('public-interviews.follow-up-status', [
+                        'interview' => $interview,
+                        'key' => $followUpKey,
+                    ]),
                 ],
             ]);
         }
 
-        $this->markInterviewAsCompleted($interview);
-
-        return response()->json([
-            'completed' => true,
-            'message' => self::COMPLETION_MESSAGE,
-        ]);
+        return $this->resolveNextQuestionResponse($interview);
     }
 
     public function feedback(
@@ -181,6 +190,53 @@ class PublicInterviewRunController extends Controller
             'saved' => true,
             'candidate_custom_question' => $interview->candidate_custom_question,
         ]);
+    }
+
+    public function followUpStatus(Interview $interview, string $key): JsonResponse
+    {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        $entry = Cache::get("follow_up:{$key}");
+
+        if (! is_array($entry)) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        $response = $entry;
+
+        if (($entry['status'] ?? '') === 'completed' && ! ($entry['needs_follow_up'] ?? false)) {
+            $nextQuestion = $this->resolveExpectedQuestion($interview);
+
+            if ($nextQuestion instanceof InterviewQuestion) {
+                $response['next_question'] = [
+                    'id' => $nextQuestion->id,
+                    'text' => $nextQuestion->question_text,
+                    'is_follow_up' => $nextQuestion->parent_question_id !== null,
+                ];
+            } else {
+                $this->markInterviewAsCompleted($interview);
+                $response['completed'] = true;
+                $response['message'] = self::COMPLETION_MESSAGE;
+            }
+        }
+
+        if (($entry['status'] ?? '') === 'failed') {
+            $nextQuestion = $this->resolveExpectedQuestion($interview);
+
+            if ($nextQuestion instanceof InterviewQuestion) {
+                $response['next_question'] = [
+                    'id' => $nextQuestion->id,
+                    'text' => $nextQuestion->question_text,
+                    'is_follow_up' => $nextQuestion->parent_question_id !== null,
+                ];
+            } else {
+                $this->markInterviewAsCompleted($interview);
+                $response['completed'] = true;
+                $response['message'] = self::COMPLETION_MESSAGE;
+            }
+        }
+
+        return response()->json($response);
     }
 
     public function transcribe(
@@ -350,6 +406,50 @@ class PublicInterviewRunController extends Controller
             'started_at' => $interview->started_at ?? now(),
             'completed_at' => $interview->completed_at ?? now(),
         ])->save();
+    }
+
+    private const SKIP_ANSWER = 'Не знаю ответ';
+
+    private function shouldCheckFollowUp(Interview $interview, ?string $candidateAnswer): bool
+    {
+        $position = $interview->position;
+
+        if (! $position instanceof Position || ! $position->follow_up_enabled) {
+            return false;
+        }
+
+        if ($candidateAnswer === null || trim($candidateAnswer) === '') {
+            return false;
+        }
+
+        if (trim($candidateAnswer) === self::SKIP_ANSWER) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function resolveNextQuestionResponse(Interview $interview): JsonResponse
+    {
+        $nextQuestion = $this->resolveExpectedQuestion($interview);
+
+        if ($nextQuestion instanceof InterviewQuestion) {
+            return response()->json([
+                'completed' => false,
+                'next_question' => [
+                    'id' => $nextQuestion->id,
+                    'text' => $nextQuestion->question_text,
+                    'is_follow_up' => $nextQuestion->parent_question_id !== null,
+                ],
+            ]);
+        }
+
+        $this->markInterviewAsCompleted($interview);
+
+        return response()->json([
+            'completed' => true,
+            'message' => self::COMPLETION_MESSAGE,
+        ]);
     }
 
     private function storeAudioForTranscription(

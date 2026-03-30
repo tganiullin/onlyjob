@@ -21,7 +21,7 @@ final class AiInterviewReviewer implements InterviewReviewer
 
     public function review(Interview $interview): InterviewReviewResult
     {
-        $interview->loadMissing(['position', 'interviewQuestions']);
+        $interview->loadMissing(['position', 'interviewQuestions.followUps']);
 
         $response = $this->providerResolver
             ->resolveForFeature('interview_review')
@@ -68,6 +68,7 @@ Scoring rules (answer_score):
 - Keep scores realistic and grounded in the candidate answer only.
 - If answer is empty or irrelevant, score it close to 1 and explain why.
 - Do not skip any question.
+- Some questions may include follow-up exchanges. Consider both the original answer AND the follow-up answers when scoring. A strong follow-up answer can improve the overall score.
 
 Adequacy scoring rules (adequacy_score):
 - Rate the behavioral appropriateness of each answer from 1 to 10.
@@ -93,16 +94,28 @@ PROMPT;
     private function buildUserPrompt(Interview $interview): string
     {
         $questions = $interview->interviewQuestions
+            ->whereNull('parent_question_id')
             ->sortBy('sort_order')
             ->values()
             ->map(static function (InterviewQuestion $question): array {
-                return [
+                $data = [
                     'interview_question_id' => $question->id,
                     'sort_order' => $question->sort_order,
                     'question' => $question->question_text,
                     'evaluation_instructions' => $question->evaluation_instructions_snapshot,
                     'candidate_answer' => $question->candidate_answer,
                 ];
+
+                if ($question->followUps->isNotEmpty()) {
+                    $data['follow_ups'] = $question->followUps
+                        ->map(static fn (InterviewQuestion $followUp): array => [
+                            'follow_up_question' => $followUp->question_text,
+                            'candidate_answer' => $followUp->candidate_answer,
+                        ])
+                        ->all();
+                }
+
+                return $data;
             })
             ->all();
 
@@ -153,7 +166,7 @@ PROMPT;
      */
     private function buildJsonSchema(Interview $interview): array
     {
-        $questionCount = $interview->interviewQuestions->count();
+        $questionCount = $interview->interviewQuestions->whereNull('parent_question_id')->count();
 
         return [
             'type' => 'object',
