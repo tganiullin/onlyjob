@@ -5,13 +5,7 @@
     $mimeType = 'audio/webm';
 
     if (filled($audioPath) && filled($questionId)) {
-        $disk = \Illuminate\Support\Facades\Storage::disk();
-
-        if ($disk->providesTemporaryUrls() && $disk->exists($audioPath)) {
-            $audioUrl = $disk->temporaryUrl($audioPath, now()->addMinutes(30));
-        } else {
-            $audioUrl = route('interview-audio.stream', ['interviewQuestion' => $questionId]);
-        }
+        $audioUrl = route('interview-audio.stream', ['interviewQuestion' => $questionId]);
 
         $ext = strtolower(pathinfo($audioPath, PATHINFO_EXTENSION));
         $mimeType = match ($ext) {
