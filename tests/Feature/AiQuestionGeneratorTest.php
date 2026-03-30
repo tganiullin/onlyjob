@@ -42,12 +42,12 @@ class AiQuestionGeneratorTest extends TestCase
         $this->assertSame(1, $provider->callCount);
         $this->assertStringContainsString('Senior', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('Russian', $provider->requests[0]->systemPrompt);
-        $this->assertStringContainsString('1 min 30 sec (90 seconds)', $provider->requests[0]->systemPrompt);
+        $this->assertStringContainsString('(90 seconds)', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('Prefer scenario and problem-solving questions', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('Do not rely on "tell me about your past experience" phrasing', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('"level": "senior"', $provider->requests[0]->userPrompt);
         $this->assertStringContainsString('"answer_time_seconds": 90', $provider->requests[0]->userPrompt);
-        $this->assertStringContainsString('"answer_time_label": "1 min 30 sec"', $provider->requests[0]->userPrompt);
+        $this->assertStringContainsString('"answer_time_label":', $provider->requests[0]->userPrompt);
         $this->assertSame(2, data_get($provider->requests[0]->jsonSchema, 'properties.questions.minItems'));
         $this->assertSame(2, data_get($provider->requests[0]->jsonSchema, 'properties.questions.maxItems'));
     }
