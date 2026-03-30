@@ -56,42 +56,8 @@ final class AiCompanyQuestionsGenerator implements CompanyQuestionsGenerator
         return $this->resolvePrompt(
             'company_questions_generation',
             'system_prompt',
-            $this->defaultSystemPrompt(),
             $placeholders,
         );
-    }
-
-    private function defaultSystemPrompt(): string
-    {
-        return <<<'PROMPT'
-You are an HR assistant creating FAQ-style company questions and concise answers for job candidates.
-
-Task:
-- Analyze provided company or vacancy description.
-- Decide yourself how many question-answer pairs are useful for this description.
-- Include only questions a candidate would realistically ask before or after an interview.
-- Keep answers concise, factual, and candidate-friendly.
-
-Question quality:
-- Questions must be specific and practical.
-- Avoid duplicates and vague formulations.
-- Prefer compensation policy, process, growth, team, format, tools, and expectations when relevant.
-
-Answer quality:
-- Each answer should be direct and clear.
-- Keep each answer to 1-3 short sentences.
-- Write answers as if the company is speaking to the candidate in first person plural ("мы", "у нас", "предоставляем", "работаем").
-- Do not reference the source text or analysis process.
-- Do not use phrases like "в описании", "указано", "упоминается", "судя по", "из текста".
-- Do not invent confidential or unverifiable details. If detail is not in the description, provide a safe generic answer.
-
-Language:
-{{output_language}}
-
-Output rules:
-- Return only valid JSON matching the provided schema.
-- Do not include markdown, comments, or extra keys.
-PROMPT;
     }
 
     private function buildUserPrompt(string $description, mixed $title): string
@@ -106,17 +72,8 @@ PROMPT;
         return $this->resolvePrompt(
             'company_questions_generation',
             'user_prompt',
-            $this->defaultUserPrompt(),
             ['payload_json' => $encodedPayload],
         );
-    }
-
-    private function defaultUserPrompt(): string
-    {
-        return <<<'PROMPT'
-Generate company FAQ style questions and answers from this input:
-{{payload_json}}
-PROMPT;
     }
 
     /**
@@ -198,18 +155,8 @@ PROMPT;
 
     private function resolveOutputLanguageRule(): string
     {
-        $outputLanguage = config('ai.features.company_questions_generation.output_language');
-
-        if (! is_string($outputLanguage) || $outputLanguage === '') {
-            return 'Write all generated question and answer text in Russian.';
-        }
-
-        return match (strtolower(trim($outputLanguage))) {
-            'ru', 'russian', 'русский', 'same_as_input' => 'Write all generated question and answer text in Russian.',
-            default => sprintf(
-                'Write all generated question and answer text in %s.',
-                $outputLanguage,
-            ),
-        };
+        return $this->resolvePrompt('company_questions_generation', 'output_language_template', [
+            'language' => $this->resolveOutputLanguage('company_questions_generation'),
+        ]);
     }
 }

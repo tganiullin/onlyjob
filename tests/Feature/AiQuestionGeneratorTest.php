@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use Database\Seeders\AiPromptSeeder;
 use InvalidArgumentException;
 use Tests\Fakes\FakeAiProvider;
 use Tests\TestCase;
@@ -13,6 +14,7 @@ class AiQuestionGeneratorTest extends TestCase
 {
     public function test_it_generates_questions_and_uses_position_level_in_prompt(): void
     {
+        $this->seed(AiPromptSeeder::class);
         $provider = new FakeAiProvider([
             [
                 'questions' => [
@@ -54,6 +56,8 @@ class AiQuestionGeneratorTest extends TestCase
 
     public function test_it_throws_exception_when_generated_payload_is_invalid(): void
     {
+        $this->seed(AiPromptSeeder::class);
+
         $provider = new FakeAiProvider([
             [
                 'foo' => 'bar',

@@ -9,6 +9,7 @@ use App\Filament\Resources\Positions\Pages\CreatePosition;
 use App\Models\Position;
 use App\Models\PositionCompanyQuestion;
 use App\Models\User;
+use Database\Seeders\AiPromptSeeder;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +20,13 @@ use Tests\TestCase;
 class CreatePositionAiQuestionsTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(AiPromptSeeder::class);
+    }
 
     public function test_create_page_saves_ai_generated_questions_and_keeps_title_unchanged(): void
     {

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\AI\Exceptions\AiProviderException;
 use App\AI\Features\SpeechToText\OpenAiSpeechTranscriber;
+use Database\Seeders\AiPromptSeeder;
 use Illuminate\Http\UploadedFile;
 use OpenAI\Contracts\ClientContract;
 use OpenAI\Contracts\Resources\AudioContract;
@@ -15,6 +16,7 @@ class OpenAiSpeechTranscriberTest extends TestCase
 {
     public function test_it_uses_speech_to_text_feature_config_for_transcription(): void
     {
+        $this->seed(AiPromptSeeder::class);
         config()->set('ai.features.speech_to_text.model', 'stt-primary-model');
         config()->set('ai.features.speech_to_text.temperature', 0.35);
 

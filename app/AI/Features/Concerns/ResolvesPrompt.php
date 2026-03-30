@@ -3,15 +3,14 @@
 namespace App\AI\Features\Concerns;
 
 use App\Models\AiPrompt;
+use RuntimeException;
 
 trait ResolvesPrompt
 {
     /**
-     * Resolve a prompt from DB with placeholder substitution, falling back to the given default.
-     *
      * @param  array<string, string>  $placeholders
      */
-    protected function resolvePrompt(string $feature, string $type, string $default, array $placeholders = []): string
+    protected function resolvePrompt(string $feature, string $type, array $placeholders = []): string
     {
         $resolved = AiPrompt::resolve($feature, $type, $placeholders);
 
@@ -19,6 +18,6 @@ trait ResolvesPrompt
             return $resolved;
         }
 
-        return AiPrompt::replacePlaceholders($default, $placeholders);
+        throw new RuntimeException("AI prompt not found: feature={$feature}, type={$type}. Run the AiPromptSeeder.");
     }
 }

@@ -9,6 +9,7 @@ use App\Models\InterviewQuestion;
 use App\Models\Position;
 use App\Models\Question;
 use App\Services\InterviewReviewService;
+use Database\Seeders\AiPromptSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\Fakes\FakeAiProvider;
@@ -17,6 +18,13 @@ use Tests\TestCase;
 class CheckInterviewJobTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(AiPromptSeeder::class);
+    }
 
     public function test_job_does_not_review_pending_interview(): void
     {

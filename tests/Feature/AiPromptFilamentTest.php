@@ -109,6 +109,27 @@ class AiPromptFilamentTest extends TestCase
         $this->assertNull($prompt->versions()->first()->change_note);
     }
 
+    public function test_saving_without_content_change_does_not_create_version(): void
+    {
+        $prompt = AiPrompt::factory()->create([
+            'feature' => 'interview_review',
+            'type' => 'user_prompt',
+            'content' => 'Same content',
+        ]);
+
+        Livewire::test(EditAiPrompt::class, ['record' => $prompt->getRouteKey()])
+            ->fillForm([
+                'content' => 'Same content',
+                'change_note' => 'No real change',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $prompt->refresh();
+        $this->assertSame('Same content', $prompt->content);
+        $this->assertSame(0, $prompt->versions()->count());
+    }
+
     public function test_create_page_is_not_accessible(): void
     {
         $this->assertFalse(AiPromptResource::canCreate());

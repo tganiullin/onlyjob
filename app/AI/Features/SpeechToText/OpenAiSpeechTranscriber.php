@@ -54,7 +54,7 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
                 }
             }
 
-            return $this->sanitizeTranscript(trim((string) $response->text));
+            return trim((string) $response->text);
         } catch (Throwable $exception) {
             throw AiProviderException::requestFailed('openai-stt', $exception);
         } finally {
@@ -62,15 +62,6 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
                 unlink($temporaryAudioPath);
             }
         }
-    }
-
-    private function sanitizeTranscript(string $transcript): string
-    {
-        if ($transcript === '') {
-            return '';
-        }
-
-        return $transcript;
     }
 
     private function normalizeLanguage(string $language): ?string
@@ -142,15 +133,6 @@ final class OpenAiSpeechTranscriber implements SpeechTranscriber
         return $this->resolvePrompt(
             'speech_to_text',
             'prompt',
-            $this->defaultSpeechToTextPrompt(),
         );
-    }
-
-    private function defaultSpeechToTextPrompt(): string
-    {
-        return 'The speaker may switch between Russian and English in one sentence. '
-            .'Transcribe exactly what is said and never invent words that are not present in the audio. '
-            .'If the audio has no intelligible speech, return an empty string. '
-            .'Preserve technical terms and acronyms without translating them (for example: Query Builder, SQL, Eloquent, Laravel, API, MVC, ORM, HTTP, JSON).';
     }
 }
