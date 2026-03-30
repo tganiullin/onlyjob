@@ -68,7 +68,11 @@ Scoring rules (answer_score):
 - Keep scores realistic and grounded in the candidate answer only.
 - If answer is empty or irrelevant, score it close to 1 and explain why.
 - Do not skip any question.
-- Some questions may include follow-up exchanges. Consider both the original answer AND the follow-up answers when scoring. A strong follow-up answer can improve the overall score.
+
+Follow-up scoring rules:
+- Some questions may include follow-up exchanges. Score each follow-up answer individually in the "follow_ups" array.
+- Also score the root question considering the full exchange (original + follow-ups). A strong follow-up can improve the root score.
+- Each follow-up result must include: interview_question_id, answer_score, adequacy_score, ai_comment.
 
 Adequacy scoring rules (adequacy_score):
 - Rate the behavioral appropriateness of each answer from 1 to 10.
@@ -78,7 +82,7 @@ Adequacy scoring rules (adequacy_score):
 - 10 = fully appropriate and professional conduct.
 - 1 = severe violations (profanity, aggression, insults).
 - Most normal answers should score 9-10 even if technically wrong.
-- Do not skip any question.
+- Do not skip any question or follow-up.
 
 Language rules:
 - Write all natural-language fields strictly in {{output_language}}.
@@ -109,6 +113,7 @@ PROMPT;
                 if ($question->followUps->isNotEmpty()) {
                     $data['follow_ups'] = $question->followUps
                         ->map(static fn (InterviewQuestion $followUp): array => [
+                            'interview_question_id' => $followUp->id,
                             'follow_up_question' => $followUp->question_text,
                             'candidate_answer' => $followUp->candidate_answer,
                         ])
@@ -168,6 +173,38 @@ PROMPT;
     {
         $questionCount = $interview->interviewQuestions->whereNull('parent_question_id')->count();
 
+        $questionResultSchema = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['interview_question_id', 'answer_score', 'adequacy_score', 'ai_comment'],
+            'properties' => [
+                'interview_question_id' => [
+                    'type' => 'integer',
+                ],
+                'answer_score' => [
+                    'type' => 'number',
+                    'minimum' => 1,
+                    'maximum' => 10,
+                ],
+                'adequacy_score' => [
+                    'type' => 'number',
+                    'minimum' => 1,
+                    'maximum' => 10,
+                ],
+                'ai_comment' => [
+                    'type' => 'string',
+                    'minLength' => 1,
+                ],
+            ],
+        ];
+
+        $rootQuestionSchema = $questionResultSchema;
+        $rootQuestionSchema['required'][] = 'follow_ups';
+        $rootQuestionSchema['properties']['follow_ups'] = [
+            'type' => 'array',
+            'items' => $questionResultSchema,
+        ];
+
         return [
             'type' => 'object',
             'additionalProperties' => false,
@@ -181,30 +218,7 @@ PROMPT;
                     'type' => 'array',
                     'minItems' => $questionCount,
                     'maxItems' => $questionCount,
-                    'items' => [
-                        'type' => 'object',
-                        'additionalProperties' => false,
-                        'required' => ['interview_question_id', 'answer_score', 'adequacy_score', 'ai_comment'],
-                        'properties' => [
-                            'interview_question_id' => [
-                                'type' => 'integer',
-                            ],
-                            'answer_score' => [
-                                'type' => 'number',
-                                'minimum' => 1,
-                                'maximum' => 10,
-                            ],
-                            'adequacy_score' => [
-                                'type' => 'number',
-                                'minimum' => 1,
-                                'maximum' => 10,
-                            ],
-                            'ai_comment' => [
-                                'type' => 'string',
-                                'minLength' => 1,
-                            ],
-                        ],
-                    ],
+                    'items' => $rootQuestionSchema,
                 ],
             ],
         ];

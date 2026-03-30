@@ -139,6 +139,11 @@ Scoring rules (answer_score):
 - If answer is empty or irrelevant, score it close to 1 and explain why.
 - Do not skip any question.
 
+Follow-up scoring rules:
+- Some questions may include follow-up exchanges. Score each follow-up answer individually in the "follow_ups" array.
+- Also score the root question considering the full exchange (original + follow-ups). A strong follow-up can improve the root score.
+- Each follow-up result must include: interview_question_id, answer_score, adequacy_score, ai_comment.
+
 Adequacy scoring rules (adequacy_score):
 - Rate the behavioral appropriateness of each answer from 1 to 10.
 - Use up to 2 decimal places.
@@ -147,7 +152,7 @@ Adequacy scoring rules (adequacy_score):
 - 10 = fully appropriate and professional conduct.
 - 1 = severe violations (profanity, aggression, insults).
 - Most normal answers should score 9-10 even if technically wrong.
-- Do not skip any question.
+- Do not skip any question or follow-up.
 
 Language rules:
 - Write all natural-language fields strictly in {{output_language}}.

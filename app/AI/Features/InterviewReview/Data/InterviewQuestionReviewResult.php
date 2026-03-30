@@ -6,17 +6,21 @@ use InvalidArgumentException;
 
 final readonly class InterviewQuestionReviewResult
 {
+    /**
+     * @param  list<self>  $followUpResults
+     */
     public function __construct(
         public int $interviewQuestionId,
         public float $answerScore,
         public float $adequacyScore,
         public string $aiComment,
+        public array $followUpResults = [],
     ) {}
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    public static function fromArray(array $payload): self
+    public static function fromArray(array $payload, bool $parseFollowUps = true): self
     {
         $questionId = $payload['interview_question_id'] ?? null;
         $answerScore = $payload['answer_score'] ?? null;
@@ -39,11 +43,22 @@ final readonly class InterviewQuestionReviewResult
             throw new InvalidArgumentException('AI comment is required.');
         }
 
+        $followUpResults = [];
+
+        if ($parseFollowUps && is_array($payload['follow_ups'] ?? null)) {
+            foreach ($payload['follow_ups'] as $followUp) {
+                if (is_array($followUp)) {
+                    $followUpResults[] = self::fromArray($followUp, parseFollowUps: false);
+                }
+            }
+        }
+
         return new self(
             interviewQuestionId: (int) $questionId,
             answerScore: max(1, min(10, round((float) $answerScore, 2))),
             adequacyScore: max(1, min(10, round((float) $adequacyScore, 2))),
             aiComment: trim($aiComment),
+            followUpResults: $followUpResults,
         );
     }
 }
