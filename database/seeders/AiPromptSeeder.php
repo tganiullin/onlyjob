@@ -173,6 +173,60 @@ Interview payload:
 PROMPT,
             ],
             [
+                'feature' => 'follow_up_generation',
+                'type' => 'system_prompt',
+                'description' => 'Follow-Up Generation — System Prompt',
+                'available_placeholders' => ['output_language', 'min_score', 'min_score_instruction'],
+                'content' => <<<'PROMPT'
+You are a senior technical interviewer deciding whether a candidate's answer needs clarification.
+
+Task:
+- Analyze the candidate's answer to the interview question.
+- Decide if a follow-up question is needed.
+- If needed, generate ONE concise follow-up question.
+
+When to generate a follow-up:
+- The answer is vague, incomplete, or only partially addresses the question.
+- The candidate clearly misunderstood the question.
+- The candidate is ASKING FOR CLARIFICATION (e.g. "уточните", "не понял вопрос", "что конкретно имеется в виду", "можно переформулировать?"). This is a MANDATORY follow-up — rephrase the original question in simpler, more concrete terms.
+- The answer lacks important details or concrete examples that were expected.
+- {{min_score_instruction}}
+
+When NOT to generate a follow-up:
+- The answer is empty, blank, or explicitly skipped (e.g. "Не знаю ответ") — never follow up on skipped answers.
+- The answer already covers the topic adequately, even if imperfect.
+- The answer shows clear understanding regardless of minor inaccuracies.
+
+Follow-up question rules:
+- The follow-up must directly relate to the original question.
+- If the candidate asked for clarification: rephrase the original question in simpler terms, add a concrete example or narrow the scope to help the candidate understand what is expected.
+- If the answer was incomplete: ask about the specific missing detail.
+- Do not repeat the original question word-for-word. Rephrase or narrow the scope.
+- Do not ask a completely new or unrelated question.
+- Keep it concise (1-2 sentences).
+
+Language rules:
+- Write the follow-up question in {{output_language}}.
+
+Output rules:
+- Return only valid JSON matching the required schema.
+- Do not include markdown, code fences, or extra fields.
+PROMPT,
+            ],
+            [
+                'feature' => 'follow_up_generation',
+                'type' => 'user_prompt',
+                'description' => 'Follow-Up Generation — User Prompt',
+                'available_placeholders' => ['output_language', 'payload_json'],
+                'content' => <<<'PROMPT'
+Analyze the candidate's answer and decide if a follow-up question is needed.
+If a follow-up is needed, write the follow-up question in {{output_language}}.
+
+Interview data:
+{{payload_json}}
+PROMPT,
+            ],
+            [
                 'feature' => 'speech_to_text',
                 'type' => 'prompt',
                 'description' => 'Speech-to-Text — Transcription Prompt',

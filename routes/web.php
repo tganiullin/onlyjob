@@ -34,6 +34,9 @@ Route::prefix('public/interviews')->name('public-interviews.')->group(function (
     Route::post('{interview}/questions/{interviewQuestion}', [PublicInterviewRunController::class, 'answer'])
         ->middleware('throttle:public-interview-answer')
         ->name('questions.answer');
+    Route::get('{interview}/follow-up-status/{key}', [PublicInterviewRunController::class, 'followUpStatus'])
+        ->middleware('throttle:public-interview-follow-up-status')
+        ->name('follow-up-status');
     Route::post('{interview}/feedback', [PublicInterviewRunController::class, 'feedback'])
         ->middleware('throttle:public-interview-answer')
         ->name('feedback');

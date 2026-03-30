@@ -24,6 +24,9 @@ class Position extends Model
         'answer_time_seconds',
         'level',
         'is_public',
+        'follow_up_enabled',
+        'max_follow_ups_per_question',
+        'follow_up_min_score',
     ];
 
     /**
@@ -36,6 +39,9 @@ class Position extends Model
             'answer_time_seconds' => PositionAnswerTime::class,
             'level' => PositionLevel::class,
             'is_public' => 'boolean',
+            'follow_up_enabled' => 'boolean',
+            'max_follow_ups_per_question' => 'integer',
+            'follow_up_min_score' => 'integer',
         ];
     }
 

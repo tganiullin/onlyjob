@@ -98,20 +98,33 @@ class ViewInterview extends ViewRecord
                         : 'No questions yet.')
                     ->schema([
                         Repeater::make('interviewQuestions')
-                            ->relationship()
+                            ->relationship(
+                                modifyQueryUsing: static fn (Builder $query): Builder => $query
+                                    ->orderBy('sort_order')
+                                    ->orderBy('id'),
+                            )
                             ->label('')
                             ->hidden(static fn (Interview $record): bool => ! $record->interviewQuestions()->exists())
                             ->defaultItems(0)
                             ->addable(false)
                             ->deletable(false)
                             ->reorderable(false)
-                            ->itemLabel(static fn (array $state): ?string => filled($state['question_text'] ?? null)
-                                ? Str::limit((string) $state['question_text'], 200)
-                                : null)
+                            ->itemLabel(static function (array $state): ?string {
+                                $text = $state['question_text'] ?? null;
+
+                                if (! filled($text)) {
+                                    return null;
+                                }
+
+                                $prefix = filled($state['parent_question_id'] ?? null) ? '↳ Follow-up: ' : '';
+
+                                return $prefix.Str::limit((string) $text, 200);
+                            })
                             ->collapsible()
                             ->collapsed()
                             ->schema([
                                 Hidden::make('id'),
+                                Hidden::make('parent_question_id'),
                                 Hidden::make('candidate_answer_audio_path'),
                                 Textarea::make('question_text')
                                     ->label('Question')

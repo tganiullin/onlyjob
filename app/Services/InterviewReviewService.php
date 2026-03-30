@@ -41,6 +41,7 @@ final class InterviewReviewService
     private function applyQuestionResults(Interview $interview, InterviewReviewResult $reviewResult): void
     {
         $expectedQuestionIds = $interview->interviewQuestions
+            ->whereNull('parent_question_id')
             ->pluck('id')
             ->map(static fn (mixed $id): int => (int) $id)
             ->sort()
@@ -60,7 +61,7 @@ final class InterviewReviewService
             throw new InvalidArgumentException('AI review result does not match interview question ids.');
         }
 
-        foreach ($interview->interviewQuestions as $interviewQuestion) {
+        foreach ($interview->interviewQuestions->whereNull('parent_question_id') as $interviewQuestion) {
             $questionResult = $questionResultsById->get($interviewQuestion->id);
 
             if (! $questionResult instanceof InterviewQuestionReviewResult) {
