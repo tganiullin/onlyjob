@@ -459,7 +459,6 @@ class PublicInterviewRunController extends Controller
         string $transcriptionKey,
     ): string {
         $extension = $this->resolveAudioExtension($audioFile);
-        $contentType = $this->resolveAudioContentType($extension);
         $questionId = $request->validated('interview_question_id');
 
         if ($questionId !== null) {
@@ -469,7 +468,7 @@ class PublicInterviewRunController extends Controller
 
             if ($interviewQuestion instanceof InterviewQuestion) {
                 $path = sprintf('interview-audio/%d/%d.%s', $interview->id, $interviewQuestion->id, $extension);
-                Storage::put($path, $audioFile->getContent(), ['ContentType' => $contentType]);
+                Storage::put($path, $audioFile->getContent());
 
                 $interviewQuestion->forceFill([
                     'candidate_answer_audio_path' => $path,
@@ -480,20 +479,9 @@ class PublicInterviewRunController extends Controller
         }
 
         $path = sprintf('temp-transcriptions/%s.%s', $transcriptionKey, $extension);
-        Storage::put($path, $audioFile->getContent(), ['ContentType' => $contentType]);
+        Storage::put($path, $audioFile->getContent());
 
         return $path;
-    }
-
-    private function resolveAudioContentType(string $extension): string
-    {
-        return match ($extension) {
-            'ogg' => 'audio/ogg',
-            'wav' => 'audio/wav',
-            'm4a' => 'audio/mp4',
-            'mp3' => 'audio/mpeg',
-            default => 'audio/webm',
-        };
     }
 
     private function resolveAudioExtension(UploadedFile $file): string
