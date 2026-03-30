@@ -48,37 +48,46 @@ class InterviewAudioController extends Controller
             mkdir($tempDir, 0755, true);
         }
 
-        $this->cleanupExpiredCache($tempDir);
+        $finalPath = $tempDir.'/'.md5($path).'.'.$extension;
 
-        $tempPath = $tempDir.'/'.md5($path).'.'.$extension;
-
-        if (file_exists($tempPath) && filemtime($tempPath) > time() - self::TEMP_CACHE_SECONDS) {
-            return $tempPath;
+        if (file_exists($finalPath) && filesize($finalPath) > 0 && filemtime($finalPath) > time() - self::TEMP_CACHE_SECONDS) {
+            return $finalPath;
         }
 
-        $stream = $disk->readStream($path);
+        $lockPath = $finalPath.'.lock';
+        $lockHandle = fopen($lockPath, 'cb');
 
-        if ($stream === null) {
-            abort(404);
+        if ($lockHandle === false) {
+            abort(500);
         }
 
-        $tempFile = fopen($tempPath, 'wb');
-        stream_copy_to_stream($stream, $tempFile);
-        fclose($tempFile);
-        fclose($stream);
+        try {
+            flock($lockHandle, LOCK_EX);
 
-        return $tempPath;
-    }
-
-    private function cleanupExpiredCache(string $dir): void
-    {
-        $cutoff = time() - self::TEMP_CACHE_SECONDS;
-
-        foreach (glob($dir.'/*') as $file) {
-            if (is_file($file) && filemtime($file) < $cutoff) {
-                @unlink($file);
+            if (file_exists($finalPath) && filesize($finalPath) > 0 && filemtime($finalPath) > time() - self::TEMP_CACHE_SECONDS) {
+                return $finalPath;
             }
+
+            $stream = $disk->readStream($path);
+
+            if ($stream === null) {
+                abort(404);
+            }
+
+            $writePath = $finalPath.'.tmp.'.getmypid();
+            $writeHandle = fopen($writePath, 'wb');
+            stream_copy_to_stream($stream, $writeHandle);
+            fclose($writeHandle);
+            fclose($stream);
+
+            rename($writePath, $finalPath);
+        } finally {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+            @unlink($lockPath);
         }
+
+        return $finalPath;
     }
 
     private function serveBinaryFile(string $localPath, string $mimeType): BinaryFileResponse
