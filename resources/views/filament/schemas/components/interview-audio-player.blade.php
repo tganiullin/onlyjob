@@ -25,6 +25,14 @@
         </p>
         <audio controls preload="metadata" class="w-full">
             <source src="{{ $audioUrl }}" type="{{ $mimeType }}">
+            Ваш браузер не поддерживает воспроизведение этого аудио.
         </audio>
+        <a
+            href="{{ $audioUrl }}"
+            download
+            class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 underline hover:text-gray-600 dark:hover:text-gray-300"
+        >
+            Скачать аудио
+        </a>
     </div>
 @endif
