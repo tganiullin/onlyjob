@@ -9,6 +9,7 @@ use App\AI\Features\Concerns\ResolvesPrompt;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use App\Enums\QuestionAnswerMode;
 use BackedEnum;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -256,6 +257,7 @@ final class AiQuestionGenerator implements QuestionGenerator
             $normalizedQuestions[] = [
                 'text' => trim($text),
                 'evaluation_instructions' => trim($evaluationInstructions),
+                'answer_mode' => QuestionAnswerMode::Voice->value,
             ];
         }
 
