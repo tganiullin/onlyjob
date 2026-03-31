@@ -18,6 +18,7 @@ use App\Models\PositionCompanyQuestion;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -28,9 +29,9 @@ class PublicInterviewRunController extends Controller
 {
     private const COMPLETION_MESSAGE = 'Спасибо! Вы успешно завершили первый этап интервью.';
 
-    public function run(Interview $interview): View
+    public function run(Request $request, Interview $interview): View
     {
-        $this->abortIfInterviewNotAccessible($interview);
+        $this->abortIfInterviewNotAccessibleOrEstablishSession($request, $interview);
 
         $questions = $interview->interviewQuestions()
             ->orderBy('sort_order')
@@ -384,6 +385,29 @@ class PublicInterviewRunController extends Controller
         return response()->json([
             'saved' => true,
         ]);
+    }
+
+    private function abortIfInterviewNotAccessibleOrEstablishSession(Request $request, Interview $interview): void
+    {
+        $sessionInterviewId = session('public_interview_id');
+
+        if (! is_numeric($sessionInterviewId) || (int) $sessionInterviewId !== $interview->id) {
+            if (! $request->hasValidSignature()) {
+                abort(403);
+            }
+
+            $request->session()->put('public_interview_id', $interview->id);
+        }
+
+        $interview->loadMissing('position');
+
+        if (! $interview->position instanceof Position) {
+            abort(404);
+        }
+
+        if (config('telegram.confirmation_required') && $interview->telegram_confirmed_at === null) {
+            abort(403);
+        }
     }
 
     private function abortIfInterviewNotAccessible(Interview $interview): void
