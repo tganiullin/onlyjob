@@ -37,6 +37,7 @@ const confirmationStatusEndpoint = ref('');
 const telegramDeepLink = ref('');
 const pollIntervalMs = 3000;
 let confirmationPoller = null;
+let confirmationPollingInFlight = false;
 let activeClientRequestId = createClientRequestId();
 
 const totalTimeLabel = computed(() => {
@@ -90,16 +91,24 @@ function resetClientRequestId() {
 
 function stopConfirmationPolling() {
     if (confirmationPoller !== null) {
-        window.clearInterval(confirmationPoller);
+        window.clearTimeout(confirmationPoller);
         confirmationPoller = null;
     }
+    confirmationPollingInFlight = false;
+}
+
+function scheduleNextPoll() {
+    confirmationPoller = window.setTimeout(async () => {
+        await checkConfirmationStatus();
+        if (confirmationPoller !== null) {
+            scheduleNextPoll();
+        }
+    }, pollIntervalMs);
 }
 
 function startConfirmationPolling() {
     stopConfirmationPolling();
-    confirmationPoller = window.setInterval(() => {
-        checkConfirmationStatus();
-    }, pollIntervalMs);
+    scheduleNextPoll();
 }
 
 function resetPendingConfirmationState() {
@@ -111,9 +120,11 @@ function resetPendingConfirmationState() {
 }
 
 async function checkConfirmationStatus() {
-    if (!confirmationStatusEndpoint.value) {
+    if (!confirmationStatusEndpoint.value || confirmationPollingInFlight) {
         return;
     }
+
+    confirmationPollingInFlight = true;
 
     try {
         const response = await fetch(confirmationStatusEndpoint.value, {
@@ -144,6 +155,8 @@ async function checkConfirmationStatus() {
         }
     } catch {
         // Keep polling: network hiccups should not reset the confirmation flow.
+    } finally {
+        confirmationPollingInFlight = false;
     }
 }
 
