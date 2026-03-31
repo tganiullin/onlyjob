@@ -125,13 +125,13 @@ class PublicInterviewWithoutTelegramConfirmationTest extends TestCase
     {
         $position = Position::factory()->public()->create();
 
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'text' => 'First question',
             'sort_order' => 1,
         ]);
 
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'text' => 'Second question',
             'sort_order' => 2,

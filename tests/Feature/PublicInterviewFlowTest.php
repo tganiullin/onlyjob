@@ -270,13 +270,13 @@ class PublicInterviewFlowTest extends TestCase
     {
         $position = Position::factory()->public()->create();
 
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 1,
             'text' => 'First question?',
         ]);
 
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 2,
             'text' => 'Second question?',
@@ -349,13 +349,13 @@ class PublicInterviewFlowTest extends TestCase
     {
         $position = Position::factory()->public()->create();
 
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 1,
             'text' => 'First question?',
         ]);
 
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 2,
             'text' => 'Second question?',

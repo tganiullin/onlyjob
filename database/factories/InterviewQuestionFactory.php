@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\QuestionAnswerMode;
 use App\Models\Interview;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -23,11 +24,19 @@ class InterviewQuestionFactory extends Factory
             'parent_question_id' => null,
             'question_text' => fake()->sentence().'?',
             'evaluation_instructions_snapshot' => fake()->optional()->sentence(),
+            'answer_mode' => QuestionAnswerMode::Voice,
             'sort_order' => fake()->numberBetween(1, 10),
             'candidate_answer' => fake()->optional()->paragraph(),
             'ai_comment' => fake()->optional()->sentence(),
             'answer_score' => fake()->optional()->randomFloat(2, 1, 10),
         ];
+    }
+
+    public function textMode(): static
+    {
+        return $this->state(fn (): array => [
+            'answer_mode' => QuestionAnswerMode::Text,
+        ]);
     }
 
     public function followUp(int $parentQuestionId): static

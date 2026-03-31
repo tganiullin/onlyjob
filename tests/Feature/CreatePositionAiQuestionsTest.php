@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use App\Enums\QuestionAnswerMode;
 use App\Filament\Resources\Positions\Pages\CreatePosition;
 use App\Models\Position;
 use App\Models\PositionCompanyQuestion;
@@ -70,7 +71,10 @@ class CreatePositionAiQuestionsTest extends TestCase
                     'minimum_score' => 7,
                     'answer_time_seconds' => PositionAnswerTime::TwoMinutesThirtySeconds->value,
                     'level' => PositionLevel::Senior->value,
-                    'questions' => $generatedQuestions,
+                    'questions' => array_map(
+                        static fn (array $question): array => [...$question, 'answer_mode' => QuestionAnswerMode::Voice->value],
+                        $generatedQuestions
+                    ),
                     'companyQuestions' => [
                         [
                             'question' => 'Как часто индексация зарплаты?',
