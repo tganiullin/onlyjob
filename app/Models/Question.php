@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\QuestionAnswerMode;
 use App\Models\Concerns\AssignsSortOrderOnCreate;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,7 @@ class Question extends Model
         'text',
         'sort_order',
         'evaluation_instructions',
+        'answer_mode',
     ];
 
     /**
@@ -30,6 +32,7 @@ class Question extends Model
         return [
             'position_id' => 'integer',
             'sort_order' => 'integer',
+            'answer_mode' => QuestionAnswerMode::class,
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\AI\Features\CompanyQuestionsGeneration\Contracts\CompanyQuestionsGenerator;
+use Database\Seeders\AiPromptSeeder;
 use InvalidArgumentException;
 use Tests\Fakes\FakeAiProvider;
 use Tests\TestCase;
@@ -11,6 +12,8 @@ class AiCompanyQuestionsGeneratorTest extends TestCase
 {
     public function test_it_generates_company_questions_and_allows_ai_to_choose_count(): void
     {
+        $this->seed(AiPromptSeeder::class);
+
         $provider = new FakeAiProvider([
             [
                 'questions' => [
@@ -51,6 +54,8 @@ class AiCompanyQuestionsGeneratorTest extends TestCase
 
     public function test_it_throws_exception_when_company_questions_payload_is_invalid(): void
     {
+        $this->seed(AiPromptSeeder::class);
+
         $provider = new FakeAiProvider([
             [
                 'foo' => 'bar',

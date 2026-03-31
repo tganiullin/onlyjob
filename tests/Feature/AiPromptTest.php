@@ -10,6 +10,7 @@ use App\Models\AiPrompt;
 use App\Models\AiPromptVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\Fakes\FakeAiProvider;
 use Tests\TestCase;
 
@@ -113,14 +114,14 @@ class AiPromptTest extends TestCase
         $this->assertSame(1, $versions->last()->version_number);
     }
 
-    public function test_resolves_prompt_trait_uses_database_prompt_over_default(): void
+    public function test_resolves_prompt_trait_uses_database_prompt(): void
     {
-        AiPrompt::factory()->create([
-            'feature' => 'question_generation',
-            'type' => 'system_prompt',
-            'content' => 'Custom prompt for {{level_label}} level.',
-            'available_placeholders' => ['level_label'],
-        ]);
+        AiPrompt::factory()->create(['feature' => 'question_generation', 'type' => 'system_prompt', 'content' => 'Custom prompt for {{level_label}} level.']);
+        AiPrompt::factory()->create(['feature' => 'question_generation', 'type' => 'user_prompt', 'content' => 'Generate {{questions_count}} questions: {{payload_json}}']);
+        AiPrompt::factory()->create(['feature' => 'question_generation', 'type' => 'level_guideline_senior', 'content' => 'Senior guideline']);
+        AiPrompt::factory()->create(['feature' => 'question_generation', 'type' => 'focus_guideline_hard_skills', 'content' => 'Hard skills guideline']);
+        AiPrompt::factory()->create(['feature' => 'question_generation', 'type' => 'answer_time_guideline', 'content' => 'Time guideline']);
+        AiPrompt::factory()->create(['feature' => 'question_generation', 'type' => 'output_language_template', 'content' => 'Write in {{language}}.']);
 
         $provider = new FakeAiProvider([
             [
@@ -145,24 +146,17 @@ class AiPromptTest extends TestCase
         $this->assertSame('Custom prompt for Senior level.', $provider->requests[0]->systemPrompt);
     }
 
-    public function test_resolves_prompt_trait_falls_back_to_default_when_no_database_prompt(): void
+    public function test_resolves_prompt_trait_throws_when_no_database_prompt(): void
     {
-        $provider = new FakeAiProvider([
-            [
-                'questions' => [
-                    ['question' => 'Q?', 'answer' => 'A.'],
-                    ['question' => 'Q2?', 'answer' => 'A2.'],
-                    ['question' => 'Q3?', 'answer' => 'A3.'],
-                ],
-            ],
-        ]);
+        $provider = new FakeAiProvider([]);
         $this->useFakeAiProvider($provider, 'company_questions_generation');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('AI prompt not found: feature=company_questions_generation');
 
         app(CompanyQuestionsGenerator::class)->generate([
             'description' => 'Tech company description.',
         ]);
-
-        $this->assertStringContainsString('FAQ-style company questions', $provider->requests[0]->systemPrompt);
     }
 
     public function test_version_belongs_to_prompt(): void

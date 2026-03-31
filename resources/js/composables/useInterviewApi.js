@@ -12,7 +12,7 @@ function sleep(ms) {
 }
 
 export function useInterviewApi(config) {
-    const { transcribeEndpoint, answerEndpointTemplate, feedbackEndpoint, customQuestionEndpoint, integritySignalEndpoint } = config;
+    const { transcribeEndpoint, answerEndpointTemplate, skipEndpointTemplate, feedbackEndpoint, customQuestionEndpoint, integritySignalEndpoint } = config;
 
     const transcribe = async (audioBlob, interviewQuestionId = null) => {
         const csrf = getCsrfToken();
@@ -100,6 +100,29 @@ export function useInterviewApi(config) {
         if (!res.ok) {
             const msg =
                 payload?.errors?.candidate_answer?.[0] ?? payload?.message ?? 'Не удалось сохранить ответ.';
+            throw new Error(msg);
+        }
+        return payload;
+    };
+
+    const skipAnswer = async (questionId) => {
+        const csrf = getCsrfToken();
+        if (!csrf) throw new Error('Не найден CSRF токен. Обновите страницу.');
+
+        const endpoint = skipEndpointTemplate.replace('__QUESTION_ID__', String(questionId));
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({}),
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const msg = payload?.message ?? 'Не удалось пропустить вопрос.';
             throw new Error(msg);
         }
         return payload;
@@ -213,5 +236,5 @@ export function useInterviewApi(config) {
         return { status: 'failed', needs_follow_up: false };
     };
 
-    return { transcribe, submitAnswer, submitFeedback, submitCustomQuestion, submitIntegritySignal, pollFollowUp };
+    return { transcribe, submitAnswer, skipAnswer, submitFeedback, submitCustomQuestion, submitIntegritySignal, pollFollowUp };
 }

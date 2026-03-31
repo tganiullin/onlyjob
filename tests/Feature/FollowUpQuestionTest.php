@@ -25,12 +25,12 @@ class FollowUpQuestionTest extends TestCase
         Queue::fake();
 
         $position = Position::factory()->withFollowUp()->create();
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 1,
             'text' => 'What is dependency injection?',
         ]);
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 2,
             'text' => 'What is ORM?',
@@ -63,12 +63,12 @@ class FollowUpQuestionTest extends TestCase
         Queue::fake();
 
         $position = Position::factory()->create(['follow_up_enabled' => false]);
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 1,
             'text' => 'What is dependency injection?',
         ]);
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 2,
             'text' => 'What is ORM?',
@@ -98,12 +98,12 @@ class FollowUpQuestionTest extends TestCase
         Queue::fake();
 
         $position = Position::factory()->withFollowUp()->create();
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 1,
             'text' => 'What is dependency injection?',
         ]);
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 2,
             'text' => 'What is ORM?',
@@ -355,12 +355,12 @@ class FollowUpQuestionTest extends TestCase
         Queue::fake();
 
         $position = Position::factory()->withFollowUp()->create();
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 1,
             'text' => 'What is SOLID?',
         ]);
-        Question::factory()->create([
+        Question::factory()->textMode()->create([
             'position_id' => $position->id,
             'sort_order' => 2,
             'text' => 'What is ORM?',
@@ -372,7 +372,7 @@ class FollowUpQuestionTest extends TestCase
 
         $mainQuestion->update(['candidate_answer' => 'SOLID is about clean code.']);
 
-        $followUp = InterviewQuestion::factory()->followUp($mainQuestion->id)->create([
+        $followUp = InterviewQuestion::factory()->followUp($mainQuestion->id)->textMode()->create([
             'interview_id' => $interview->id,
             'question_text' => 'Can you name the S and O principles?',
             'sort_order' => $mainQuestion->sort_order,

@@ -91,6 +91,7 @@ class GenerateFollowUpJob implements ShouldQueue
             'parent_question_id' => $rootQuestionId,
             'question_text' => $result->followUpQuestion,
             'evaluation_instructions_snapshot' => $rootQuestion->evaluation_instructions_snapshot,
+            'answer_mode' => $rootQuestion->answer_mode,
             'sort_order' => $rootQuestion->sort_order,
         ]);
 
@@ -100,6 +101,7 @@ class GenerateFollowUpJob implements ShouldQueue
             'follow_up' => [
                 'id' => $followUp->id,
                 'question_text' => $followUp->question_text,
+                'answer_mode' => $followUp->answer_mode->value,
             ],
         ], now()->addMinutes(10));
     }

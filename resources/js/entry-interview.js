@@ -12,6 +12,7 @@ if (el) {
         questions: questionsArray,
         companyQuestions: companyQuestionsArray,
         answerEndpointTemplate: el.dataset.answerEndpointTemplate ?? '',
+        skipEndpointTemplate: el.dataset.skipEndpointTemplate ?? '',
         transcribeEndpoint: el.dataset.transcribeEndpoint ?? '',
         feedbackEndpoint: el.dataset.feedbackEndpoint ?? '',
         customQuestionEndpoint: el.dataset.customQuestionEndpoint ?? '',

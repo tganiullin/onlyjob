@@ -154,44 +154,8 @@ final class AiQuestionGenerator implements QuestionGenerator
         return $this->resolvePrompt(
             'question_generation',
             'system_prompt',
-            $this->defaultSystemPrompt(),
             $placeholders,
         );
-    }
-
-    private function defaultSystemPrompt(): string
-    {
-        return <<<'PROMPT'
-You are a senior technical interviewer creating structured screening interview questions.
-
-Task:
-- Generate practical interview questions from the position description.
-- Adjust depth and complexity to the target level: {{level_label}}.
-- Keep each question concise, specific, and answerable within the allowed time.
-- Provide one short evaluation instruction for each question.
-- Prefer scenario and problem-solving questions ("How would you...", "What would happen if...", "How would you debug...") over biography questions.
-- Do not rely on "tell me about your past experience" phrasing as the primary question style.
-- Ask for concrete technical reasoning and verifiable steps, not generic opinions.
-- Each question must check one core competency at a time.
-- Avoid broad or abstract wording that can be answered vaguely.
-- Avoid stacked multi-part questions.
-
-Level alignment:
-{{level_guideline}}
-
-Focus:
-{{focus_guideline}}
-
-Time per answer:
-{{answer_time_guideline}}
-
-Language:
-{{output_language}}
-
-Output rules:
-- Return only valid JSON matching the provided schema.
-- Do not include markdown, comments, or extra keys.
-PROMPT;
     }
 
     private function buildUserPrompt(
@@ -221,17 +185,8 @@ PROMPT;
         return $this->resolvePrompt(
             'question_generation',
             'user_prompt',
-            $this->defaultUserPrompt(),
             $placeholders,
         );
-    }
-
-    private function defaultUserPrompt(): string
-    {
-        return <<<'PROMPT'
-Generate {{questions_count}} interview questions based on this input:
-{{payload_json}}
-PROMPT;
     }
 
     /**
@@ -317,58 +272,31 @@ PROMPT;
 
     private function resolveFocusGuideline(string $focus): string
     {
-        return match ($focus) {
-            'soft_skills' => 'Prioritize communication, ownership, teamwork, and stakeholder collaboration questions with role context. Keep them situational ("How would you handle..."), not generic biography prompts.',
-            'mixed' => 'Balance technical depth with collaboration checks: at least 70% technical scenario/problem-solving questions and up to 30% situational soft-skill questions.',
-            default => 'Prioritize technical hard-skill questions: architecture, debugging, implementation, and trade-offs. Keep all questions technical and scenario-driven.',
+        $type = match ($focus) {
+            'soft_skills', 'mixed' => "focus_guideline_{$focus}",
+            default => 'focus_guideline_hard_skills',
         };
+
+        return $this->resolvePrompt('question_generation', $type);
     }
 
     private function resolveLevelGuideline(PositionLevel $positionLevel): string
     {
-        return match ($positionLevel) {
-            PositionLevel::Junior => '- Focus on fundamentals, basic troubleshooting, and clear understanding of core concepts.',
-            PositionLevel::Middle => '- Focus on practical implementation, debugging, maintainability, and reasonable trade-offs.',
-            PositionLevel::Senior => '- Focus on architecture decisions, scalability, reliability, and nuanced trade-offs.',
-            PositionLevel::Lead => '- Focus on system strategy, cross-team impact, technical leadership, and decision quality.',
-        };
+        return $this->resolvePrompt('question_generation', "level_guideline_{$positionLevel->value}");
     }
 
     private function resolveAnswerTimeGuideline(PositionAnswerTime $answerTime): string
     {
-        return match (true) {
-            $answerTime->value <= PositionAnswerTime::OneMinuteThirtySeconds->value => sprintf(
-                '- Candidate has %s (%d seconds) per answer. Ask narrow, high-signal questions that can be answered with one concrete example.',
-                $answerTime->getLabel(),
-                $answerTime->value,
-            ),
-            $answerTime->value <= PositionAnswerTime::TwoMinutesThirtySeconds->value => sprintf(
-                '- Candidate has %s (%d seconds) per answer. Ask specific scenario-based questions that require concise explanation of actions and outcomes.',
-                $answerTime->getLabel(),
-                $answerTime->value,
-            ),
-            default => sprintf(
-                '- Candidate has %s (%d seconds) per answer. Questions may include context, but still require concrete and verifiable response details.',
-                $answerTime->getLabel(),
-                $answerTime->value,
-            ),
-        };
+        return $this->resolvePrompt('question_generation', 'answer_time_guideline', [
+            'label' => $answerTime->getLabel(),
+            'seconds' => (string) $answerTime->value,
+        ]);
     }
 
     private function resolveOutputLanguageRule(): string
     {
-        $outputLanguage = config('ai.features.question_generation.output_language');
-
-        if (! is_string($outputLanguage) || $outputLanguage === '') {
-            return 'Write all generated question text and evaluation instructions in Russian.';
-        }
-
-        return match (strtolower(trim($outputLanguage))) {
-            'ru', 'russian', 'русский', 'same_as_input' => 'Write all generated question text and evaluation instructions in Russian.',
-            default => sprintf(
-                'Write all generated question text and evaluation instructions in %s.',
-                $outputLanguage,
-            ),
-        };
+        return $this->resolvePrompt('question_generation', 'output_language_template', [
+            'language' => $this->resolveOutputLanguage('question_generation'),
+        ]);
     }
 }

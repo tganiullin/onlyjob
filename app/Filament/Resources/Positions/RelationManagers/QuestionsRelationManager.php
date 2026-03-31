@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Positions\RelationManagers;
 
+use App\Enums\QuestionAnswerMode;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -9,6 +10,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -34,6 +36,13 @@ class QuestionsRelationManager extends RelationManager
                     ->label('Evaluation instructions')
                     ->rows(3)
                     ->columnSpanFull(),
+                ToggleButtons::make('answer_mode')
+                    ->label('Answer mode')
+                    ->options(QuestionAnswerMode::class)
+                    ->inline()
+                    ->default(QuestionAnswerMode::Voice->value)
+                    ->required()
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -53,6 +62,10 @@ class QuestionsRelationManager extends RelationManager
                     ->label('Evaluation instructions')
                     ->limit(70)
                     ->toggleable(),
+                TextColumn::make('answer_mode')
+                    ->label('Answer mode')
+                    ->badge()
+                    ->sortable(),
             ])
             ->defaultSort('sort_order')
             ->reorderable('sort_order')

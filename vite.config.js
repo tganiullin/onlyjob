@@ -11,6 +11,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/entry-interview.js',
                 'resources/js/entry-position-vue.js',
+                'resources/css/filament/admin/theme.css',
             ],
             refresh: true,
         }),

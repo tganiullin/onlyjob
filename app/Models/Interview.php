@@ -96,7 +96,7 @@ class Interview extends Model
         $questions = Question::query()
             ->where('position_id', $this->position_id)
             ->orderBy('sort_order')
-            ->get(['id', 'text', 'evaluation_instructions', 'sort_order']);
+            ->get(['id', 'text', 'evaluation_instructions', 'answer_mode', 'sort_order']);
 
         if ($questions->isEmpty()) {
             return;
@@ -108,6 +108,7 @@ class Interview extends Model
                     'question_id' => $question->id,
                     'question_text' => $question->text,
                     'evaluation_instructions_snapshot' => $question->evaluation_instructions,
+                    'answer_mode' => $question->answer_mode,
                     'sort_order' => $question->sort_order,
                 ];
             })->all(),

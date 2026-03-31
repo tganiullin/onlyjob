@@ -6,6 +6,7 @@ use App\AI\Features\CompanyQuestionsGeneration\Contracts\CompanyQuestionsGenerat
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use App\Enums\QuestionAnswerMode;
 use App\Models\Position;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -158,6 +159,13 @@ class PositionForm
                                         Textarea::make('evaluation_instructions')
                                             ->label('Evaluation instructions')
                                             ->rows(2)
+                                            ->columnSpanFull(),
+                                        ToggleButtons::make('answer_mode')
+                                            ->label('Answer mode')
+                                            ->options(QuestionAnswerMode::class)
+                                            ->inline()
+                                            ->default(QuestionAnswerMode::Voice->value)
+                                            ->required()
                                             ->columnSpanFull(),
                                     ])
                                     ->orderColumn('sort_order')

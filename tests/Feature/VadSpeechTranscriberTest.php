@@ -6,6 +6,7 @@ use App\AI\Features\SpeechToText\Contracts\VoiceActivityDetector;
 use App\AI\Features\SpeechToText\Data\VoiceActivityResult;
 use App\AI\Features\SpeechToText\OpenAiSpeechTranscriber;
 use App\AI\Features\SpeechToText\VadSpeechTranscriber;
+use Database\Seeders\AiPromptSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Contracts\ClientContract;
@@ -64,6 +65,8 @@ class VadSpeechTranscriberTest extends TestCase
 
     public function test_it_delegates_to_openai_when_vad_detects_speech(): void
     {
+        $this->seed(AiPromptSeeder::class);
+
         config()->set('ai.features.speech_to_text.model', 'stt-primary-model');
         config()->set('ai.features.speech_to_text.temperature', 0.15);
 

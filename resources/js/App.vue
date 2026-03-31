@@ -10,6 +10,7 @@ const props = defineProps({
     questions: { type: Array, default: () => [] },
     companyQuestions: { type: Array, default: () => [] },
     answerEndpointTemplate: { type: String, default: '' },
+    skipEndpointTemplate: { type: String, default: '' },
     transcribeEndpoint: { type: String, default: '' },
     feedbackEndpoint: { type: String, default: '' },
     customQuestionEndpoint: { type: String, default: '' },
@@ -84,6 +85,7 @@ const followUpPending = ref(false);
 const api = useInterviewApi({
     transcribeEndpoint: props.transcribeEndpoint,
     answerEndpointTemplate: props.answerEndpointTemplate,
+    skipEndpointTemplate: props.skipEndpointTemplate,
     feedbackEndpoint: props.feedbackEndpoint,
     customQuestionEndpoint: props.customQuestionEndpoint,
     integritySignalEndpoint: props.integritySignalEndpoint,
@@ -104,6 +106,9 @@ const {
 
 const isRecordingPhrase = computed(() => recordingMode.value === 'phrase');
 const isRecordingAnswer = computed(() => recordingMode.value === 'answer');
+
+const currentAnswerMode = computed(() => questions.value[currentIndex.value]?.answer_mode ?? 'voice');
+const hasAnyVoiceQuestion = computed(() => questions.value.some((q) => (q.answer_mode ?? 'voice') === 'voice'));
 
 const showRecordHint = ref(false);
 const highlightRecordButton = ref(false);
@@ -256,7 +261,7 @@ function handleTogglePhraseRecord() {
 }
 
 function handleChatContinue() {
-    if (!phraseCompleted.value) {
+    if (hasAnyVoiceQuestion.value && !phraseCompleted.value) {
         microphoneStatus.value = 'Сначала запишите тестовую фразу.';
         microphoneStatusError.value = true;
         return;
@@ -296,6 +301,7 @@ function advanceToNextQuestion(payload) {
                 text: nextQ.text,
                 candidate_answer: null,
                 is_follow_up: nextQ.is_follow_up ?? false,
+                answer_mode: nextQ.answer_mode ?? 'voice',
             });
             nextIdx = currentIndex.value + 1;
         }
@@ -329,6 +335,7 @@ async function handleFollowUpCheck(statusUrl) {
                 text: fu.question_text,
                 candidate_answer: null,
                 is_follow_up: true,
+                answer_mode: fu.answer_mode ?? 'voice',
             });
             currentIndex.value += 1;
             answerStatus.value = '';
@@ -446,9 +453,38 @@ function handleRecordToggle() {
     });
 }
 
-function handleSkipAnswer() {
+async function handleSkipAnswer() {
+    const question = questions.value[currentIndex.value];
+    if (!question || submitting.value) return;
+
     skipSubmitting.value = true;
-    submitAnswer('Не знаю ответ');
+    submitting.value = true;
+    answerStatus.value = 'Пропускаем вопрос...';
+    answerStatusError.value = false;
+    stopTimer();
+
+    try {
+        const payload = await api.skipAnswer(question.id);
+        submittedAnswers[question.id] = 'Не знаю ответ';
+        advanceToNextQuestion(payload);
+    } catch (err) {
+        answerStatus.value = err instanceof Error ? err.message : 'Ошибка при пропуске вопроса.';
+        answerStatusError.value = true;
+        startTimer(
+            () => {},
+            () => {
+                answerStatus.value = 'Время на вопрос истекло. Запишите ответ или выберите "Не знаю ответ".';
+                answerStatusError.value = true;
+            },
+        );
+    } finally {
+        submitting.value = false;
+        skipSubmitting.value = false;
+    }
+}
+
+function handleTextAnswerSubmit(text) {
+    submitAnswer(text);
 }
 
 async function handleFeedbackSelect(rating) {
@@ -581,6 +617,8 @@ onUnmounted(() => {
                     :show-record-hint="showRecordHint"
                     :highlight-record-button="highlightRecordButton"
                     :recording-supported="recordingSupported"
+                    :current-answer-mode="currentAnswerMode"
+                    :has-any-voice-question="hasAnyVoiceQuestion"
                     :feedback-rating="feedbackRating"
                     :feedback-submitting="feedbackSubmitting"
                     :feedback-status="feedbackStatus"
@@ -597,6 +635,7 @@ onUnmounted(() => {
                     @start="handleInstructionsStart"
                     @record-toggle="handleRecordToggle"
                     @skip-answer="handleSkipAnswer"
+                    @text-answer-submit="handleTextAnswerSubmit"
                     @feedback-select="handleFeedbackSelect"
                     @custom-question-submit="handleCustomQuestionSubmit"
                 />

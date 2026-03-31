@@ -7,6 +7,7 @@ use App\AI\Features\InterviewReview\Data\InterviewQuestionReviewResult;
 use App\AI\Features\InterviewReview\Data\InterviewReviewResult;
 use App\Enums\InterviewStatus;
 use App\Models\Interview;
+use App\Models\InterviewQuestion;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -22,7 +23,7 @@ final class InterviewReviewService
 
         DB::transaction(function () use ($interview, $reviewResult): void {
             $freshInterview = Interview::query()
-                ->with(['position', 'interviewQuestions'])
+                ->with(['position', 'interviewQuestions.followUps'])
                 ->findOrFail($interview->id);
 
             $this->applyQuestionResults($freshInterview, $reviewResult);
@@ -61,6 +62,8 @@ final class InterviewReviewService
             throw new InvalidArgumentException('AI review result does not match interview question ids.');
         }
 
+        $allQuestionsById = $interview->interviewQuestions->keyBy('id');
+
         foreach ($interview->interviewQuestions->whereNull('parent_question_id') as $interviewQuestion) {
             $questionResult = $questionResultsById->get($interviewQuestion->id);
 
@@ -73,6 +76,20 @@ final class InterviewReviewService
                 'adequacy_score' => $questionResult->adequacyScore,
                 'ai_comment' => $questionResult->aiComment,
             ])->saveQuietly();
+
+            foreach ($questionResult->followUpResults as $followUpResult) {
+                $followUpQuestion = $allQuestionsById->get($followUpResult->interviewQuestionId);
+
+                if (! $followUpQuestion instanceof InterviewQuestion) {
+                    continue;
+                }
+
+                $followUpQuestion->forceFill([
+                    'answer_score' => $followUpResult->answerScore,
+                    'adequacy_score' => $followUpResult->adequacyScore,
+                    'ai_comment' => $followUpResult->aiComment,
+                ])->saveQuietly();
+            }
         }
     }
 

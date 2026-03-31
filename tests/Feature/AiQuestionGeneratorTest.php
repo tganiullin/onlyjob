@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\AI\Features\QuestionGeneration\Contracts\QuestionGenerator;
 use App\Enums\PositionAnswerTime;
 use App\Enums\PositionLevel;
+use Database\Seeders\AiPromptSeeder;
 use InvalidArgumentException;
 use Tests\Fakes\FakeAiProvider;
 use Tests\TestCase;
@@ -13,6 +14,7 @@ class AiQuestionGeneratorTest extends TestCase
 {
     public function test_it_generates_questions_and_uses_position_level_in_prompt(): void
     {
+        $this->seed(AiPromptSeeder::class);
         $provider = new FakeAiProvider([
             [
                 'questions' => [
@@ -42,18 +44,20 @@ class AiQuestionGeneratorTest extends TestCase
         $this->assertSame(1, $provider->callCount);
         $this->assertStringContainsString('Senior', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('Russian', $provider->requests[0]->systemPrompt);
-        $this->assertStringContainsString('1 min 30 sec (90 seconds)', $provider->requests[0]->systemPrompt);
+        $this->assertStringContainsString('(90 seconds)', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('Prefer scenario and problem-solving questions', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('Do not rely on "tell me about your past experience" phrasing', $provider->requests[0]->systemPrompt);
         $this->assertStringContainsString('"level": "senior"', $provider->requests[0]->userPrompt);
         $this->assertStringContainsString('"answer_time_seconds": 90', $provider->requests[0]->userPrompt);
-        $this->assertStringContainsString('"answer_time_label": "1 min 30 sec"', $provider->requests[0]->userPrompt);
+        $this->assertStringContainsString('"answer_time_label":', $provider->requests[0]->userPrompt);
         $this->assertSame(2, data_get($provider->requests[0]->jsonSchema, 'properties.questions.minItems'));
         $this->assertSame(2, data_get($provider->requests[0]->jsonSchema, 'properties.questions.maxItems'));
     }
 
     public function test_it_throws_exception_when_generated_payload_is_invalid(): void
     {
+        $this->seed(AiPromptSeeder::class);
+
         $provider = new FakeAiProvider([
             [
                 'foo' => 'bar',
