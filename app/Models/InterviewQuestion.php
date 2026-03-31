@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\QuestionAnswerMode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,7 @@ class InterviewQuestion extends Model
         'parent_question_id',
         'question_text',
         'evaluation_instructions_snapshot',
+        'answer_mode',
         'sort_order',
         'candidate_answer',
         'candidate_answer_audio_path',
@@ -38,6 +40,7 @@ class InterviewQuestion extends Model
             'interview_id' => 'integer',
             'question_id' => 'integer',
             'parent_question_id' => 'integer',
+            'answer_mode' => QuestionAnswerMode::class,
             'sort_order' => 'integer',
             'answer_score' => 'decimal:2',
             'adequacy_score' => 'decimal:2',
@@ -92,6 +95,16 @@ class InterviewQuestion extends Model
     public function isFollowUp(): bool
     {
         return $this->parent_question_id !== null;
+    }
+
+    public function isVoiceMode(): bool
+    {
+        return $this->answer_mode === QuestionAnswerMode::Voice;
+    }
+
+    public function hasAudioRecording(): bool
+    {
+        return $this->candidate_answer_audio_path !== null;
     }
 
     public function resolveRootQuestionId(): int

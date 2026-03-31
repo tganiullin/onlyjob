@@ -18,6 +18,7 @@ use App\Models\PositionCompanyQuestion;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -28,19 +29,20 @@ class PublicInterviewRunController extends Controller
 {
     private const COMPLETION_MESSAGE = 'Спасибо! Вы успешно завершили первый этап интервью.';
 
-    public function run(Interview $interview): View
+    public function run(Request $request, Interview $interview): View
     {
-        $this->abortIfInterviewNotAccessible($interview);
+        $this->abortIfInterviewNotAccessibleOrEstablishSession($request, $interview);
 
         $questions = $interview->interviewQuestions()
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'question_text', 'candidate_answer', 'parent_question_id'])
+            ->get(['id', 'question_text', 'candidate_answer', 'parent_question_id', 'answer_mode'])
             ->map(static fn (InterviewQuestion $question): array => [
                 'id' => $question->id,
                 'text' => $question->question_text,
                 'candidate_answer' => $question->candidate_answer,
                 'is_follow_up' => $question->parent_question_id !== null,
+                'answer_mode' => $question->answer_mode->value,
             ])
             ->all();
 
@@ -110,8 +112,15 @@ class PublicInterviewRunController extends Controller
                 'next_question' => [
                     'id' => $expectedQuestion->id,
                     'text' => $expectedQuestion->question_text,
+                    'answer_mode' => $expectedQuestion->answer_mode->value,
                 ],
             ], 409);
+        }
+
+        if ($expectedQuestion->isVoiceMode() && ! $expectedQuestion->hasAudioRecording()) {
+            return response()->json([
+                'message' => 'Для этого вопроса требуется голосовой ответ.',
+            ], 422);
         }
 
         $candidateAnswer = $request->validated('candidate_answer');
@@ -142,6 +151,55 @@ class PublicInterviewRunController extends Controller
                 ],
             ]);
         }
+
+        return $this->resolveNextQuestionResponse($interview);
+    }
+
+    public function skip(
+        Interview $interview,
+        InterviewQuestion $interviewQuestion,
+    ): JsonResponse {
+        $this->abortIfInterviewNotAccessible($interview);
+
+        if ($interviewQuestion->interview_id !== $interview->id) {
+            abort(404);
+        }
+
+        if ($this->isInterviewTerminal($interview)) {
+            return response()->json([
+                'completed' => true,
+                'message' => self::COMPLETION_MESSAGE,
+            ]);
+        }
+
+        $expectedQuestion = $this->resolveExpectedQuestion($interview);
+
+        if (! $expectedQuestion instanceof InterviewQuestion) {
+            $this->markInterviewAsCompleted($interview);
+
+            return response()->json([
+                'completed' => true,
+                'message' => self::COMPLETION_MESSAGE,
+            ]);
+        }
+
+        if ($interviewQuestion->id !== $expectedQuestion->id) {
+            return response()->json([
+                'completed' => false,
+                'message' => 'Please answer the current question before moving to the next one.',
+                'next_question' => [
+                    'id' => $expectedQuestion->id,
+                    'text' => $expectedQuestion->question_text,
+                    'answer_mode' => $expectedQuestion->answer_mode->value,
+                ],
+            ], 409);
+        }
+
+        $expectedQuestion->forceFill([
+            'candidate_answer' => self::SKIP_ANSWER,
+        ])->save();
+
+        $this->markInterviewAsInProgress($interview);
 
         return $this->resolveNextQuestionResponse($interview);
     }
@@ -212,6 +270,7 @@ class PublicInterviewRunController extends Controller
                     'id' => $nextQuestion->id,
                     'text' => $nextQuestion->question_text,
                     'is_follow_up' => $nextQuestion->parent_question_id !== null,
+                    'answer_mode' => $nextQuestion->answer_mode->value,
                 ];
             } else {
                 $this->markInterviewAsCompleted($interview);
@@ -228,6 +287,7 @@ class PublicInterviewRunController extends Controller
                     'id' => $nextQuestion->id,
                     'text' => $nextQuestion->question_text,
                     'is_follow_up' => $nextQuestion->parent_question_id !== null,
+                    'answer_mode' => $nextQuestion->answer_mode->value,
                 ];
             } else {
                 $this->markInterviewAsCompleted($interview);
@@ -327,6 +387,29 @@ class PublicInterviewRunController extends Controller
         ]);
     }
 
+    private function abortIfInterviewNotAccessibleOrEstablishSession(Request $request, Interview $interview): void
+    {
+        $sessionInterviewId = session('public_interview_id');
+
+        if (! is_numeric($sessionInterviewId) || (int) $sessionInterviewId !== $interview->id) {
+            if (! $request->hasValidSignature()) {
+                abort(403);
+            }
+
+            $request->session()->put('public_interview_id', $interview->id);
+        }
+
+        $interview->loadMissing('position');
+
+        if (! $interview->position instanceof Position) {
+            abort(404);
+        }
+
+        if (config('telegram.confirmation_required') && $interview->telegram_confirmed_at === null) {
+            abort(403);
+        }
+    }
+
     private function abortIfInterviewNotAccessible(Interview $interview): void
     {
         $sessionInterviewId = session('public_interview_id');
@@ -422,7 +505,7 @@ class PublicInterviewRunController extends Controller
             return false;
         }
 
-        if (trim($candidateAnswer) === self::SKIP_ANSWER) {
+        if ($candidateAnswer === self::SKIP_ANSWER) {
             return false;
         }
 
@@ -440,6 +523,7 @@ class PublicInterviewRunController extends Controller
                     'id' => $nextQuestion->id,
                     'text' => $nextQuestion->question_text,
                     'is_follow_up' => $nextQuestion->parent_question_id !== null,
+                    'answer_mode' => $nextQuestion->answer_mode->value,
                 ],
             ]);
         }

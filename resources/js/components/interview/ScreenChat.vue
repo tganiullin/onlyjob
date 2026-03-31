@@ -29,6 +29,8 @@ const props = defineProps({
     showRecordHint: { type: Boolean, default: false },
     highlightRecordButton: { type: Boolean, default: false },
     recordingSupported: { type: Boolean, default: true },
+    currentAnswerMode: { type: String, default: 'voice' },
+    hasAnyVoiceQuestion: { type: Boolean, default: true },
     feedbackRating: { type: Number, default: null },
     followUpPending: { type: Boolean, default: false },
     mainQuestionsCount: { type: Number, default: 0 },
@@ -47,9 +49,21 @@ const emit = defineEmits([
     'start',
     'record-toggle',
     'skip-answer',
+    'text-answer-submit',
     'feedback-select',
     'custom-question-submit',
 ]);
+
+const textAnswerInput = ref('');
+
+function handleTextAnswerSubmit() {
+    const text = textAnswerInput.value.trim();
+    if (!text) {
+        return;
+    }
+    emit('text-answer-submit', text);
+    textAnswerInput.value = '';
+}
 
 function formatMessageTime() {
     const d = new Date();
@@ -58,12 +72,21 @@ function formatMessageTime() {
         .join(':');
 }
 
-const welcomeTexts = computed(() => [
-    'Привет 👋',
-    'Я - Ариадна, твой виртуальный интервьюер.',
-    `Я запрограммирован оценить твои знания с помощью ряда фундаментальных вопросов. Для ответа на каждый вопрос у тебя будет ${props.answerTimeLabel}.`,
-    'Чтобы записать ответ, нужно использовать микрофон. Давай проверим, что он включен и работает.',
-]);
+const welcomeTexts = computed(() => {
+    const base = [
+        'Привет 👋',
+        'Я - Ариадна, твой виртуальный интервьюер.',
+        `Я запрограммирован оценить твои знания с помощью ряда фундаментальных вопросов. Для ответа на каждый вопрос у тебя будет ${props.answerTimeLabel}.`,
+    ];
+
+    if (props.hasAnyVoiceQuestion) {
+        base.push('Чтобы записать ответ, нужно использовать микрофон. Давай проверим, что он включен и работает.');
+    } else {
+        base.push('Ответы на вопросы нужно вводить текстом. Давай приступим!');
+    }
+
+    return base;
+});
 
 /** Сообщения бота по порядку: welcome — текст приветствия, sentence — блок «Прочтите предложение». time — чч:мм:сс по локальному времени пользователя. */
 const botBlocks = ref([]);
@@ -176,7 +199,9 @@ onMounted(() => {
     timeouts.push(setTimeout(() => add({ type: 'welcome', text: welcomeTexts.value[1] }), 1000));
     timeouts.push(setTimeout(() => add({ type: 'welcome', text: welcomeTexts.value[2] }), 1000 + 1000));
     timeouts.push(setTimeout(() => add({ type: 'welcome', text: welcomeTexts.value[3] }), 1000 + 1000 + 1500));
-    timeouts.push(setTimeout(() => add({ type: 'sentence' }), 1000 + 1000 + 1500 + 1000));
+    if (props.hasAnyVoiceQuestion) {
+        timeouts.push(setTimeout(() => add({ type: 'sentence' }), 1000 + 1000 + 1500 + 1000));
+    }
 });
 
 onUnmounted(() => {
@@ -221,11 +246,11 @@ onUnmounted(() => {
                                 {{ microphoneStatus || 'Разрешите доступ к микрофону и проверьте запись.' }}
                             </p>
 
-                            <div v-if="!phraseCompleted" class="mt-4 flex flex-wrap gap-3">
+                            <div v-if="!phraseCompleted" class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                                 <button
                                     type="button"
                                     :disabled="phraseCompleted"
-                                    class="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                                     @click="$emit('request-microphone')"
                                 >
                                     Разрешить доступ к микрофону
@@ -234,7 +259,7 @@ onUnmounted(() => {
                                     type="button"
                                     :disabled="transcribing || phraseCompleted || (!isRecordingPhrase && !hasMicrophoneAccess)"
                                     :class="[
-                                        'inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-7 text-sm font-semibold text-white transition-colors duration-200 ease-[ease]',
+                                        'inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-7 text-sm font-semibold text-white transition-colors duration-200 ease-[ease] sm:w-auto',
                                         isRecordingPhrase
                                             ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
                                             : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
@@ -256,6 +281,33 @@ onUnmounted(() => {
                     <span v-if="block.time && block.type === 'welcome'" class="text-xs text-[#b4b8cc]">{{ block.time }}</span>
                 </div>
             </div>
+
+            <!-- Кнопка «Продолжить» для текстового режима (без проверки микрофона) -->
+            <Transition name="chat-message">
+                <div
+                    v-if="!hasAnyVoiceQuestion && botBlocks.length >= 4 && !showInstructionsMessage && !interviewStarted"
+                    class="flex items-start gap-3"
+                >
+                    <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+                        style="background-color: var(--color-brand);"
+                        aria-hidden="true"
+                    >
+                        L
+                    </div>
+                    <div class="flex min-w-0 flex-1 flex-col gap-1">
+                        <div class="chat-bubble min-w-0 max-w-[620px] rounded-2xl rounded-tl-md bg-white px-5 py-4 text-base text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                            <button
+                                type="button"
+                                class="btn-brand mt-2 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 px-6 text-sm font-semibold text-white"
+                                @click="$emit('continue')"
+                            >
+                                Продолжить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
 
             <Transition name="chat-message">
                 <div v-if="phraseResult !== ''" class="flex items-start justify-end gap-3">
@@ -330,11 +382,16 @@ onUnmounted(() => {
                             <h3 class="text-xl font-bold uppercase tracking-wide text-[#636985]">Как отвечать на вопросы</h3>
                             <p class="mt-3 text-base text-[#555b77]">Время на ответ отсчитывается с момента появления вопроса на экране.</p>
 
-                            <ol class="mt-6 list-decimal space-y-2 pl-5 text-base font-semibold text-[#252a44]">
+                            <ol v-if="hasAnyVoiceQuestion" class="mt-6 list-decimal space-y-2 pl-5 text-base font-semibold text-[#252a44]">
                                 <li>Ознакомьтесь с вопросом</li>
                                 <li>Нажмите «Записать ответ»</li>
                                 <li>Дайте развернутый ответ, подкрепив его примерами</li>
                                 <li>Для сохранения нажмите «Остановить запись»</li>
+                            </ol>
+                            <ol v-else class="mt-6 list-decimal space-y-2 pl-5 text-base font-semibold text-[#252a44]">
+                                <li>Ознакомьтесь с вопросом</li>
+                                <li>Напишите развернутый ответ в текстовое поле</li>
+                                <li>Нажмите «Отправить»</li>
                             </ol>
 
                             <button
@@ -617,64 +674,112 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- Панель записи ответа (только в фазе интервью, до завершения, не во время follow-up polling) -->
+        <!-- Панель ответа (только в фазе интервью, до завершения, не во время follow-up polling) -->
         <div
             v-show="interviewStarted && !interviewCompleted && !followUpPending"
-            class="fixed inset-x-0 bottom-8 z-20 py-4 backdrop-blur-[4px]"
+            class="fixed inset-x-0 bottom-4 z-20 py-3 backdrop-blur-[4px] sm:bottom-8 sm:py-4"
         >
-            <div class="mx-auto flex max-w-[1080px] flex-col items-center justify-center gap-4 px-10">
-                <div class="flex flex-wrap items-center justify-center gap-4">
-                    <button
-                        type="button"
-                        :disabled="transcribing || submitting || isRecordingAnswer || currentQuestionIndex >= questions.length"
-                        class="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
-                        @click="$emit('skip-answer')"
+            <div class="mx-auto flex max-w-[1080px] flex-col items-center justify-center gap-3 px-4 sm:gap-4 sm:px-10">
+                <!-- Текстовый режим -->
+                <template v-if="currentAnswerMode === 'text'">
+                    <div class="flex w-full max-w-[620px] flex-col gap-3 sm:flex-row sm:items-end">
+                        <textarea
+                            v-model="textAnswerInput"
+                            :disabled="submitting || currentQuestionIndex >= questions.length"
+                            rows="3"
+                            maxlength="12000"
+                            placeholder="Введите ваш ответ..."
+                            class="w-full resize-none rounded-2xl border border-[#d8dcf2] bg-white px-5 py-3 text-sm text-[#2f344d] placeholder-[#a0a5c0] outline-none transition-colors focus:border-[var(--color-brand)] disabled:opacity-60 sm:flex-1"
+                            @keydown.meta.enter="handleTextAnswerSubmit"
+                            @keydown.ctrl.enter="handleTextAnswerSubmit"
+                        ></textarea>
+                        <div class="flex shrink-0 items-center gap-2 sm:flex-col">
+                            <button
+                                type="button"
+                                :disabled="submitting || !textAnswerInput.trim() || currentQuestionIndex >= questions.length"
+                                class="btn-brand inline-flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                                @click="handleTextAnswerSubmit"
+                            >
+                                <span
+                                    v-if="submitting && !skipSubmitting"
+                                    class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                    aria-hidden="true"
+                                ></span>
+                                <template v-else>Отправить</template>
+                            </button>
+                            <button
+                                type="button"
+                                :disabled="submitting || currentQuestionIndex >= questions.length"
+                                class="inline-flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:flex-none"
+                                @click="$emit('skip-answer')"
+                            >
+                                <span
+                                    v-if="skipSubmitting"
+                                    class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#2f334c] border-t-transparent"
+                                    aria-hidden="true"
+                                ></span>
+                                <template v-else>Не знаю ответ</template>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Голосовой режим -->
+                <template v-else>
+                    <div class="flex w-full flex-col-reverse items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
+                        <button
+                            type="button"
+                            :disabled="transcribing || submitting || isRecordingAnswer || currentQuestionIndex >= questions.length"
+                            class="inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                            @click="$emit('skip-answer')"
+                        >
+                            <span
+                                v-if="skipSubmitting"
+                                class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#2f334c] border-t-transparent"
+                                aria-hidden="true"
+                            ></span>
+                            <template v-else>
+                                Не знаю ответ
+                            </template>
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="transcribing || submitting || interviewCompleted || currentQuestionIndex >= questions.length"
+                            :class="[
+                                'inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white transition-colors duration-200 ease-[ease] sm:w-auto',
+                                isRecordingAnswer
+                                    ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
+                                    : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
+                                highlightRecordButton && !isRecordingAnswer
+                                    ? 'ring-4 ring-[var(--color-brand)]/25 ring-offset-2 ring-offset-white motion-safe:animate-pulse'
+                                    : '',
+                            ]"
+                            @click="$emit('record-toggle')"
+                        >
+                            <span
+                                v-if="transcribing || (submitting && !skipSubmitting)"
+                                class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                aria-hidden="true"
+                            ></span>
+                            <template v-else>
+                                {{ isRecordingAnswer ? 'Остановить запись' : 'Записать ответ' }}
+                            </template>
+                        </button>
+                    </div>
+                    <p
+                        v-if="showRecordHint && !isRecordingAnswer && !transcribing && !submitting"
+                        class="text-center text-sm text-[#4f556f]"
                     >
-                        <span
-                            v-if="skipSubmitting"
-                            class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#2f334c] border-t-transparent"
-                            aria-hidden="true"
-                        ></span>
-                        <template v-else>
-                            Не знаю ответ
-                        </template>
-                    </button>
-                    <button
-                        type="button"
-                        :disabled="transcribing || submitting || interviewCompleted || currentQuestionIndex >= questions.length"
-                        :class="[
-                            'inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white transition-colors duration-200 ease-[ease]',
-                            isRecordingAnswer
-                                ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
-                                : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
-                            highlightRecordButton && !isRecordingAnswer
-                                ? 'ring-4 ring-[var(--color-brand)]/25 ring-offset-2 ring-offset-white motion-safe:animate-pulse'
-                                : '',
-                        ]"
-                        @click="$emit('record-toggle')"
+                        Нажмите «Записать ответ», чтобы отправить ответ на текущий вопрос.
+                    </p>
+                    <p
+                        v-show="!recordingSupported"
+                        class="text-center text-xs text-amber-700"
                     >
-                        <span
-                            v-if="transcribing || (submitting && !skipSubmitting)"
-                            class="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
-                            aria-hidden="true"
-                        ></span>
-                        <template v-else>
-                            {{ isRecordingAnswer ? 'Остановить запись' : 'Записать ответ' }}
-                        </template>
-                    </button>
-                </div>
-                <p
-                    v-if="showRecordHint && !isRecordingAnswer && !transcribing && !submitting"
-                    class="text-center text-sm text-[#4f556f]"
-                >
-                    Нажмите «Записать ответ», чтобы отправить ответ на текущий вопрос.
-                </p>
-                <p
-                    v-show="!recordingSupported"
-                    class="text-center text-xs text-amber-700"
-                >
-                    Запись звука не поддерживается в этом браузере. Пожалуйста, используйте Chrome или Safari.
-                </p>
+                        Запись звука не поддерживается в этом браузере. Пожалуйста, используйте Chrome или Safari.
+                    </p>
+                </template>
+
                 <p
                     v-if="answerStatus"
                     class="text-center text-sm"

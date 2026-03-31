@@ -36,4 +36,18 @@ trait ResolvesAiFeatureConfig
 
         return max(1, (int) $maxTokens);
     }
+
+    protected function resolveOutputLanguage(string $feature): string
+    {
+        $outputLanguage = config("ai.features.{$feature}.output_language");
+
+        if (! is_string($outputLanguage) || trim($outputLanguage) === '') {
+            return 'Russian';
+        }
+
+        return match (strtolower(trim($outputLanguage))) {
+            'ru', 'russian', 'русский', 'same_as_input' => 'Russian',
+            default => trim($outputLanguage),
+        };
+    }
 }

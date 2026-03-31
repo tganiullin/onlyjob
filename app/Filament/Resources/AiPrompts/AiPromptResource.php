@@ -11,10 +11,10 @@ use BackedEnum;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -48,24 +48,15 @@ class AiPromptResource extends Resource
                 TextInput::make('type')
                     ->label('Type')
                     ->disabled(),
-                Placeholder::make('available_placeholders_display')
-                    ->label('Available placeholders')
-                    ->content(static function (?AiPrompt $record): string {
-                        $placeholders = $record?->available_placeholders ?? [];
-
-                        if ($placeholders === []) {
-                            return 'No placeholders';
-                        }
-
-                        return collect($placeholders)
-                            ->map(static fn (string $p): string => '{{'.$p.'}}')
-                            ->implode(', ');
-                    }),
+                View::make('filament.schemas.components.ai-prompt-placeholders'),
                 Textarea::make('content')
                     ->label('Prompt content')
                     ->required()
                     ->rows(18)
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->live(onBlur: true),
+                View::make('filament.schemas.components.ai-prompt-missing-placeholders')
+                    ->hiddenOn('view'),
                 TextInput::make('change_note')
                     ->label('Change note')
                     ->placeholder('Describe what you changed...')

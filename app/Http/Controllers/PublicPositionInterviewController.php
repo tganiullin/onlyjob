@@ -10,6 +10,7 @@ use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
 
 class PublicPositionInterviewController extends Controller
@@ -100,7 +101,11 @@ class PublicPositionInterviewController extends Controller
         $request->session()->put('public_interview_id', $interview->id);
         $request->session()->forget('public_pending_confirmation_status_token');
 
-        $redirect = route('public-interviews.run', ['interview' => $interview]);
+        $redirect = URL::temporarySignedRoute(
+            'public-interviews.run',
+            now()->addMinutes(5),
+            ['interview' => $interview],
+        );
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -142,7 +147,11 @@ class PublicPositionInterviewController extends Controller
 
             return response()->json([
                 'status' => 'confirmed',
-                'redirect' => route('public-interviews.run', ['interview' => $interview]),
+                'redirect' => URL::temporarySignedRoute(
+                    'public-interviews.run',
+                    now()->addMinutes(5),
+                    ['interview' => $interview],
+                ),
             ]);
         }
 

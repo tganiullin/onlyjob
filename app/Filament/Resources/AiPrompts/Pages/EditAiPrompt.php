@@ -15,6 +15,12 @@ class EditAiPrompt extends EditRecord
         /** @var AiPrompt $record */
         $record = $this->getRecord();
 
+        $newContent = $this->data['content'] ?? '';
+
+        if ((string) $newContent === $record->content) {
+            return;
+        }
+
         $changeNote = $this->data['change_note'] ?? null;
 
         $record->createVersion(

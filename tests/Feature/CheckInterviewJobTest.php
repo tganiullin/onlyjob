@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Enums\InterviewStatus;
 use App\Jobs\CheckInterviewJob;
 use App\Models\Interview;
+use App\Models\InterviewQuestion;
 use App\Models\Position;
 use App\Models\Question;
 use App\Services\InterviewReviewService;
+use Database\Seeders\AiPromptSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\Fakes\FakeAiProvider;
@@ -16,6 +18,13 @@ use Tests\TestCase;
 class CheckInterviewJobTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(AiPromptSeeder::class);
+    }
 
     public function test_job_does_not_review_pending_interview(): void
     {
@@ -238,6 +247,83 @@ class CheckInterviewJobTest extends TestCase
             'status' => InterviewStatus::ReviewedPassed->value,
             'summary' => 'Retry succeeded.',
         ]);
+    }
+
+    public function test_review_scores_follow_up_questions_individually(): void
+    {
+        $interview = $this->createInterviewWithAnswers(
+            minimumScore: 5,
+            status: InterviewStatus::Completed,
+        );
+
+        $rootQuestion = $interview->interviewQuestions()->whereNull('parent_question_id')->orderBy('sort_order')->first();
+
+        $followUp = InterviewQuestion::query()->create([
+            'interview_id' => $interview->id,
+            'question_id' => null,
+            'parent_question_id' => $rootQuestion->id,
+            'question_text' => 'Can you give a concrete example of constructor injection?',
+            'evaluation_instructions_snapshot' => $rootQuestion->evaluation_instructions_snapshot,
+            'sort_order' => $rootQuestion->sort_order,
+            'candidate_answer' => 'For example, injecting a UserRepository into a controller constructor.',
+        ]);
+
+        $questions = $interview->interviewQuestions()->whereNull('parent_question_id')->orderBy('sort_order')->get();
+
+        $provider = new FakeAiProvider([
+            [
+                'summary' => 'Good understanding with follow-up improvement.',
+                'questions' => [
+                    [
+                        'interview_question_id' => $questions[0]->id,
+                        'answer_score' => 8.5,
+                        'adequacy_score' => 10.0,
+                        'ai_comment' => 'Good answer, improved with follow-up.',
+                        'follow_ups' => [
+                            [
+                                'interview_question_id' => $followUp->id,
+                                'answer_score' => 7.0,
+                                'adequacy_score' => 9.0,
+                                'ai_comment' => 'Concrete example demonstrates practical understanding.',
+                            ],
+                        ],
+                    ],
+                    [
+                        'interview_question_id' => $questions[1]->id,
+                        'answer_score' => 7.0,
+                        'adequacy_score' => 10.0,
+                        'ai_comment' => 'Solid answer.',
+                    ],
+                ],
+            ],
+        ]);
+        $this->useFakeAiProvider($provider);
+
+        (new CheckInterviewJob($interview->id))->handle(app(InterviewReviewService::class));
+
+        $this->assertSame(1, $provider->callCount);
+
+        $userPrompt = $provider->requests[0]->userPrompt;
+        $this->assertStringContainsString('Can you give a concrete example of constructor injection?', $userPrompt);
+        $this->assertStringContainsString((string) $followUp->id, $userPrompt);
+
+        $this->assertDatabaseHas('interview_questions', [
+            'id' => $followUp->id,
+            'answer_score' => '7.00',
+            'adequacy_score' => '9.00',
+            'ai_comment' => 'Concrete example demonstrates practical understanding.',
+        ]);
+
+        $this->assertDatabaseHas('interview_questions', [
+            'id' => $rootQuestion->id,
+            'answer_score' => '8.50',
+            'ai_comment' => 'Good answer, improved with follow-up.',
+        ]);
+
+        $freshInterview = $interview->fresh();
+        $this->assertSame(InterviewStatus::ReviewedPassed, $freshInterview->status);
+        $expectedScore = round((8.5 + 7.0 + 7.0) / 3, 2);
+        $this->assertEquals($expectedScore, (float) $freshInterview->score);
     }
 
     private function useFakeAiProvider(FakeAiProvider $provider): void

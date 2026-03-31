@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $position?->title }} — интервью</title>
     @vite(['resources/css/app.css', 'resources/js/entry-interview.js'])
@@ -13,6 +13,7 @@
     data-questions='@json($questions, JSON_UNESCAPED_UNICODE)'
     data-company-questions='@json($companyQuestions, JSON_UNESCAPED_UNICODE)'
     data-answer-endpoint-template="{{ route('public-interviews.questions.answer', ['interview' => $interview, 'interviewQuestion' => '__QUESTION_ID__']) }}"
+    data-skip-endpoint-template="{{ route('public-interviews.questions.skip', ['interview' => $interview, 'interviewQuestion' => '__QUESTION_ID__']) }}"
     data-transcribe-endpoint="{{ route('public-interviews.transcribe', ['interview' => $interview]) }}"
     data-feedback-endpoint="{{ route('public-interviews.feedback', ['interview' => $interview]) }}"
     data-custom-question-endpoint="{{ route('public-interviews.custom-question', ['interview' => $interview]) }}"
