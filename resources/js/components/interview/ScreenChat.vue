@@ -246,11 +246,11 @@ onUnmounted(() => {
                                 {{ microphoneStatus || 'Разрешите доступ к микрофону и проверьте запись.' }}
                             </p>
 
-                            <div v-if="!phraseCompleted" class="mt-4 flex flex-wrap gap-3">
+                            <div v-if="!phraseCompleted" class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                                 <button
                                     type="button"
                                     :disabled="phraseCompleted"
-                                    class="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                                     @click="$emit('request-microphone')"
                                 >
                                     Разрешить доступ к микрофону
@@ -259,7 +259,7 @@ onUnmounted(() => {
                                     type="button"
                                     :disabled="transcribing || phraseCompleted || (!isRecordingPhrase && !hasMicrophoneAccess)"
                                     :class="[
-                                        'inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-7 text-sm font-semibold text-white transition-colors duration-200 ease-[ease]',
+                                        'inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-7 text-sm font-semibold text-white transition-colors duration-200 ease-[ease] sm:w-auto',
                                         isRecordingPhrase
                                             ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
                                             : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
@@ -677,27 +677,27 @@ onUnmounted(() => {
         <!-- Панель ответа (только в фазе интервью, до завершения, не во время follow-up polling) -->
         <div
             v-show="interviewStarted && !interviewCompleted && !followUpPending"
-            class="fixed inset-x-0 bottom-8 z-20 py-4 backdrop-blur-[4px]"
+            class="fixed inset-x-0 bottom-4 z-20 py-3 backdrop-blur-[4px] sm:bottom-8 sm:py-4"
         >
-            <div class="mx-auto flex max-w-[1080px] flex-col items-center justify-center gap-4 px-10">
+            <div class="mx-auto flex max-w-[1080px] flex-col items-center justify-center gap-3 px-4 sm:gap-4 sm:px-10">
                 <!-- Текстовый режим -->
                 <template v-if="currentAnswerMode === 'text'">
-                    <div class="flex w-full max-w-[620px] items-end gap-3">
+                    <div class="flex w-full max-w-[620px] flex-col gap-3 sm:flex-row sm:items-end">
                         <textarea
                             v-model="textAnswerInput"
                             :disabled="submitting || currentQuestionIndex >= questions.length"
                             rows="3"
                             maxlength="12000"
                             placeholder="Введите ваш ответ..."
-                            class="flex-1 resize-none rounded-2xl border border-[#d8dcf2] bg-white px-5 py-3 text-sm text-[#2f344d] placeholder-[#a0a5c0] outline-none transition-colors focus:border-[var(--color-brand)] disabled:opacity-60"
+                            class="w-full resize-none rounded-2xl border border-[#d8dcf2] bg-white px-5 py-3 text-sm text-[#2f344d] placeholder-[#a0a5c0] outline-none transition-colors focus:border-[var(--color-brand)] disabled:opacity-60 sm:flex-1"
                             @keydown.meta.enter="handleTextAnswerSubmit"
                             @keydown.ctrl.enter="handleTextAnswerSubmit"
                         ></textarea>
-                        <div class="flex shrink-0 flex-col gap-2">
+                        <div class="flex shrink-0 items-center gap-2 sm:flex-col">
                             <button
                                 type="button"
                                 :disabled="submitting || !textAnswerInput.trim() || currentQuestionIndex >= questions.length"
-                                class="btn-brand inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                class="btn-brand inline-flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
                                 @click="handleTextAnswerSubmit"
                             >
                                 <span
@@ -710,7 +710,7 @@ onUnmounted(() => {
                             <button
                                 type="button"
                                 :disabled="submitting || currentQuestionIndex >= questions.length"
-                                class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                                class="inline-flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:flex-none"
                                 @click="$emit('skip-answer')"
                             >
                                 <span
@@ -726,11 +726,11 @@ onUnmounted(() => {
 
                 <!-- Голосовой режим -->
                 <template v-else>
-                    <div class="flex flex-wrap items-center justify-center gap-4">
+                    <div class="flex w-full flex-col-reverse items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
                         <button
                             type="button"
                             :disabled="transcribing || submitting || isRecordingAnswer || currentQuestionIndex >= questions.length"
-                            class="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[#d8dcf2] bg-white px-6 text-sm font-medium text-[#2f334c] transition-colors duration-200 ease-[ease] hover:border-[#ccd2ed] hover:bg-[#f6f7ff] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                             @click="$emit('skip-answer')"
                         >
                             <span
@@ -746,7 +746,7 @@ onUnmounted(() => {
                             type="button"
                             :disabled="transcribing || submitting || interviewCompleted || currentQuestionIndex >= questions.length"
                             :class="[
-                                'inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white transition-colors duration-200 ease-[ease]',
+                                'inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-8 text-sm font-semibold text-white transition-colors duration-200 ease-[ease] sm:w-auto',
                                 isRecordingAnswer
                                     ? 'bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-400'
                                     : 'btn-brand disabled:cursor-not-allowed disabled:bg-[var(--color-brand-disabled)] disabled:opacity-60',
