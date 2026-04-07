@@ -225,6 +225,12 @@ class ViewInterview extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('exportPdf')
+                ->label('Export PDF')
+                ->icon(Heroicon::ArrowDownTray)
+                ->color('gray')
+                ->url(static fn (Interview $record): string => route('interviews.export-pdf', $record))
+                ->openUrlInNewTab(),
             Action::make('queueAiReview')
                 ->label('Queue AI review')
                 ->color('primary')

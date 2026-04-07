@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InterviewAudioController;
+use App\Http\Controllers\InterviewPdfController;
 use App\Http\Controllers\PublicInterviewRunController;
 use App\Http\Controllers\PublicPositionInterviewController;
 use Illuminate\Support\Facades\Route;
@@ -11,6 +12,8 @@ Route::redirect('/', 'https://aya.ru');
 Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('admin/interview-audio/{interviewQuestion}', [InterviewAudioController::class, 'stream'])
         ->name('interview-audio.stream');
+    Route::get('admin/interviews/{record}/export-pdf', InterviewPdfController::class)
+        ->name('interviews.export-pdf');
 });
 
 Route::prefix('public/positions')->name('public-positions.')->group(function (): void {
