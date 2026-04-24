@@ -12,6 +12,8 @@ use App\Models\Question;
 use App\Services\TelegramAccountConfirmationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -452,6 +454,69 @@ class PublicInterviewFlowTest extends TestCase
             return $job->transcriptionKey === $response->json('transcription_key')
                 && $job->language === 'auto';
         });
+    }
+
+    public function test_transcribe_endpoint_logs_dispatched_event(): void
+    {
+        Queue::fake();
+        Log::spy();
+
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = $this->startAndConfirmInterview($position, [
+            'first_name' => 'Nora',
+            'last_name' => 'Hall',
+            'telegram' => '@nora_hall',
+        ]);
+
+        $this->post(route('public-interviews.transcribe', ['interview' => $interview]), [
+            'audio' => UploadedFile::fake()->create('speech.webm', 128, 'audio/webm'),
+            'language' => 'auto',
+        ])->assertOk();
+
+        Log::shouldHaveReceived('info')->withArgs(function (string $message, array $context) use ($interview): bool {
+            return $message === 'transcribe.dispatched'
+                && array_key_exists('transcription_key', $context)
+                && $context['interview_id'] === $interview->id
+                && $context['language'] === 'auto'
+                && array_key_exists('audio_size', $context)
+                && array_key_exists('storage_path', $context);
+        })->once();
+    }
+
+    public function test_transcription_status_logs_cache_miss(): void
+    {
+        Log::spy();
+
+        $position = Position::factory()->public()->create();
+        Question::factory()->create([
+            'position_id' => $position->id,
+            'sort_order' => 1,
+        ]);
+
+        $interview = $this->startAndConfirmInterview($position, [
+            'first_name' => 'Nora',
+            'last_name' => 'Hall',
+            'telegram' => '@nora_hall',
+        ]);
+
+        $missingKey = 'missing-transcription-key';
+        Cache::forget("transcription:{$missingKey}");
+
+        $this->get(route('public-interviews.transcription-status', [
+            'interview' => $interview,
+            'key' => $missingKey,
+        ]))->assertNotFound();
+
+        Log::shouldHaveReceived('warning')->withArgs(function (string $message, array $context) use ($interview, $missingKey): bool {
+            return $message === 'transcription_status.cache_miss'
+                && $context['transcription_key'] === $missingKey
+                && $context['interview_id'] === $interview->id;
+        })->once();
     }
 
     public function test_transcribe_endpoint_is_forbidden_without_active_public_interview_session(): void

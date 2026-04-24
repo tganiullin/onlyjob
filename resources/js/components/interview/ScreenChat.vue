@@ -41,6 +41,7 @@ const props = defineProps({
     customQuestionSubmitting: { type: Boolean, default: false },
     customQuestionStatus: { type: String, default: '' },
     customQuestionStatusError: { type: Boolean, default: false },
+    canRetryTranscribe: { type: Boolean, default: false },
 });
 const emit = defineEmits([
     'request-microphone',
@@ -48,6 +49,7 @@ const emit = defineEmits([
     'continue',
     'start',
     'record-toggle',
+    'retry-transcribe',
     'skip-answer',
     'text-answer-submit',
     'feedback-select',
@@ -787,6 +789,14 @@ onUnmounted(() => {
                 >
                     {{ answerStatus }}
                 </p>
+                <button
+                    v-if="canRetryTranscribe && answerStatusError && !transcribing && !submitting && !isRecordingAnswer"
+                    type="button"
+                    class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-[var(--color-brand)] bg-white px-5 text-sm font-semibold text-[var(--color-brand)] transition-colors duration-200 ease-[ease] hover:bg-[var(--color-brand)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    @click="$emit('retry-transcribe')"
+                >
+                    Отправить ещё раз
+                </button>
             </div>
         </div>
     </section>

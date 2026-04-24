@@ -82,6 +82,16 @@ const customQuestionStatus = ref('');
 const customQuestionStatusError = ref(false);
 const followUpPending = ref(false);
 
+const lastAnswerAudioBlob = ref(null);
+const lastAnswerAudioQuestionId = ref(null);
+const canRetryTranscribe = ref(false);
+
+function clearPendingTranscribe() {
+    lastAnswerAudioBlob.value = null;
+    lastAnswerAudioQuestionId.value = null;
+    canRetryTranscribe.value = false;
+}
+
 const api = useInterviewApi({
     transcribeEndpoint: props.transcribeEndpoint,
     answerEndpointTemplate: props.answerEndpointTemplate,
@@ -281,6 +291,8 @@ function handleInstructionsStart() {
 }
 
 function advanceToNextQuestion(payload) {
+    clearPendingTranscribe();
+
     if (payload.completed === true) {
         completed.value = true;
         currentIndex.value = questions.value.length;
@@ -398,6 +410,40 @@ async function submitAnswer(candidateAnswer) {
     }
 }
 
+async function runTranscribeAndSubmit(blob, questionId) {
+    transcribing.value = true;
+    answerStatus.value = 'Распознаю ответ...';
+    answerStatusError.value = false;
+    canRetryTranscribe.value = false;
+
+    try {
+        const text = await api.transcribe(blob, questionId);
+        const normalized = text === '' ? 'Не знаю ответ' : text;
+        clearPendingTranscribe();
+        await submitAnswer(normalized);
+    } catch (err) {
+        const isTransient = err?.isTransient === true;
+        answerStatus.value = err instanceof Error ? err.message : 'Не удалось обработать аудио.';
+        answerStatusError.value = true;
+
+        if (isTransient && lastAnswerAudioBlob.value instanceof Blob) {
+            canRetryTranscribe.value = true;
+        } else {
+            clearPendingTranscribe();
+        }
+
+        startTimer(
+            () => {},
+            () => {
+                answerStatus.value = 'Время на вопрос истекло. Запишите ответ или выберите "Не знаю ответ".';
+                answerStatusError.value = true;
+            },
+        );
+    } finally {
+        transcribing.value = false;
+    }
+}
+
 function handleRecordToggle() {
     if (isRecordingAnswer.value) {
         stopRecording();
@@ -419,31 +465,16 @@ function handleRecordToggle() {
                 answeredByRecordingQuestionIds.add(String(currentQuestionId));
             }
             resetRecordHint();
+            clearPendingTranscribe();
             answerStatus.value = 'Идет запись ответа...';
             answerStatusError.value = false;
         },
         onStop: async (blob, _mode, _vadResult) => {
             stopTimer();
-            transcribing.value = true;
-            answerStatus.value = 'Распознаю ответ...';
-            answerStatusError.value = false;
-            try {
-                const text = await api.transcribe(blob, resolveCurrentQuestionId());
-                const normalized = text === '' ? 'Не знаю ответ' : text;
-                await submitAnswer(normalized);
-            } catch (err) {
-                answerStatus.value = err instanceof Error ? err.message : 'Не удалось обработать аудио.';
-                answerStatusError.value = true;
-                startTimer(
-                    () => {},
-                    () => {
-                        answerStatus.value = 'Время на вопрос истекло. Запишите ответ или выберите "Не знаю ответ".';
-                        answerStatusError.value = true;
-                    },
-                );
-            } finally {
-                transcribing.value = false;
-            }
+            const questionId = resolveCurrentQuestionId();
+            lastAnswerAudioBlob.value = blob;
+            lastAnswerAudioQuestionId.value = questionId;
+            await runTranscribeAndSubmit(blob, questionId);
         },
         onError: (msg) => {
             answerStatus.value = msg;
@@ -451,6 +482,17 @@ function handleRecordToggle() {
             scheduleRecordHint();
         },
     });
+}
+
+async function handleRetryTranscribe() {
+    const blob = lastAnswerAudioBlob.value;
+    if (!(blob instanceof Blob) || transcribing.value || submitting.value) {
+        return;
+    }
+
+    const questionId = lastAnswerAudioQuestionId.value ?? resolveCurrentQuestionId();
+    stopTimer();
+    await runTranscribeAndSubmit(blob, questionId);
 }
 
 async function handleSkipAnswer() {
@@ -462,6 +504,7 @@ async function handleSkipAnswer() {
     answerStatus.value = 'Пропускаем вопрос...';
     answerStatusError.value = false;
     stopTimer();
+    clearPendingTranscribe();
 
     try {
         const payload = await api.skipAnswer(question.id);
@@ -629,11 +672,13 @@ onUnmounted(() => {
                     :custom-question-status-error="customQuestionStatusError"
                     :follow-up-pending="followUpPending"
                     :main-questions-count="mainQuestionsCount"
+                    :can-retry-transcribe="canRetryTranscribe"
                     @request-microphone="handleRequestMicrophone"
                     @toggle-phrase-record="handleTogglePhraseRecord"
                     @continue="handleChatContinue"
                     @start="handleInstructionsStart"
                     @record-toggle="handleRecordToggle"
+                    @retry-transcribe="handleRetryTranscribe"
                     @skip-answer="handleSkipAnswer"
                     @text-answer-submit="handleTextAnswerSubmit"
                     @feedback-select="handleFeedbackSelect"

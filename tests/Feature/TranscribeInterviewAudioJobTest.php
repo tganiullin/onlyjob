@@ -10,6 +10,7 @@ use App\Models\Question;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -71,6 +72,32 @@ class TranscribeInterviewAudioJobTest extends TestCase
         $this->assertIsArray($cached);
         $this->assertSame('failed', $cached['status']);
         $this->assertArrayHasKey('error', $cached);
+    }
+
+    public function test_job_logs_failure_on_failed(): void
+    {
+        Storage::fake();
+        Log::spy();
+
+        $position = Position::factory()->create();
+        Question::factory()->create(['position_id' => $position->id, 'sort_order' => 1]);
+        $interview = Interview::factory()->create(['position_id' => $position->id]);
+
+        $audioPath = 'temp-transcriptions/log-fail-key.webm';
+        Storage::put($audioPath, 'fake-audio-content');
+
+        $key = 'log-fail-key';
+        $job = new TranscribeInterviewAudioJob($key, $audioPath, $interview->id, 'auto', 42);
+        $job->failed(new \RuntimeException('OpenAI API error'));
+
+        Log::shouldHaveReceived('error')->withArgs(function (string $message, array $context) use ($key, $interview): bool {
+            return $message === 'transcribe.job.failed'
+                && $context['transcription_key'] === $key
+                && $context['interview_id'] === $interview->id
+                && $context['interview_question_id'] === 42
+                && $context['exception'] === \RuntimeException::class
+                && $context['message'] === 'OpenAI API error';
+        })->once();
     }
 
     public function test_job_cleans_up_temp_files_on_failure(): void

@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
@@ -36,6 +37,7 @@ class TranscribeInterviewAudioJob implements ShouldQueue
     public function handle(SpeechTranscriber $speechTranscriber): void
     {
         $tempFile = $this->downloadToTempFile();
+        $startedAtMs = (int) (microtime(true) * 1000);
 
         try {
             $audioFile = new UploadedFile($tempFile, basename($this->audioStoragePath), null, null, true);
@@ -46,6 +48,14 @@ class TranscribeInterviewAudioJob implements ShouldQueue
                 'status' => 'completed',
                 'text' => $text,
             ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+            Log::info('transcribe.job.completed', [
+                'transcription_key' => $this->transcriptionKey,
+                'interview_id' => $this->interviewId,
+                'interview_question_id' => $this->interviewQuestionId,
+                'duration_ms' => (int) (microtime(true) * 1000) - $startedAtMs,
+                'text_len' => mb_strlen($text),
+            ]);
         } finally {
             if (is_file($tempFile)) {
                 unlink($tempFile);
@@ -75,6 +85,14 @@ class TranscribeInterviewAudioJob implements ShouldQueue
             'status' => 'failed',
             'error' => 'Не удалось распознать аудио.',
         ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+        Log::error('transcribe.job.failed', [
+            'transcription_key' => $this->transcriptionKey,
+            'interview_id' => $this->interviewId,
+            'interview_question_id' => $this->interviewQuestionId,
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
+        ]);
 
         $this->cleanupTempFile();
     }

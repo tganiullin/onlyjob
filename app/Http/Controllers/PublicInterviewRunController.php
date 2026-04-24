@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -321,23 +322,38 @@ class PublicInterviewRunController extends Controller
 
         Cache::put("transcription:{$transcriptionKey}", ['status' => 'processing'], now()->addMinutes(10));
 
+        $interviewQuestionId = $request->validated('interview_question_id') !== null
+            ? (int) $request->validated('interview_question_id')
+            : null;
+
         TranscribeInterviewAudioJob::dispatch(
             $transcriptionKey,
             $audioStoragePath,
             $interview->id,
             (string) $request->validated('language'),
-            $request->validated('interview_question_id') !== null
-                ? (int) $request->validated('interview_question_id')
-                : null,
+            $interviewQuestionId,
         );
+
+        $statusUrl = route('public-interviews.transcription-status', [
+            'interview' => $interview,
+            'key' => $transcriptionKey,
+        ]);
+
+        Log::info('transcribe.dispatched', [
+            'transcription_key' => $transcriptionKey,
+            'interview_id' => $interview->id,
+            'interview_question_id' => $interviewQuestionId,
+            'language' => (string) $request->validated('language'),
+            'audio_size' => $audioFile->getSize(),
+            'audio_mime' => $audioFile->getMimeType(),
+            'audio_client_mime' => $audioFile->getClientMimeType(),
+            'storage_path' => $audioStoragePath,
+        ]);
 
         return response()->json([
             'transcription_key' => $transcriptionKey,
             'status' => 'processing',
-            'status_url' => route('public-interviews.transcription-status', [
-                'interview' => $interview,
-                'key' => $transcriptionKey,
-            ]),
+            'status_url' => $statusUrl,
         ]);
     }
 
@@ -348,6 +364,11 @@ class PublicInterviewRunController extends Controller
         $entry = Cache::get("transcription:{$key}");
 
         if (! is_array($entry)) {
+            Log::warning('transcription_status.cache_miss', [
+                'transcription_key' => $key,
+                'interview_id' => $interview->id,
+            ]);
+
             return response()->json(['status' => 'not_found'], 404);
         }
 
