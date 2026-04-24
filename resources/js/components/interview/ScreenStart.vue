@@ -25,15 +25,15 @@ const totalTimeLabel = computed(() => {
 </script>
 
 <template>
-    <section class="grid min-h-[78vh] items-center gap-16 lg:grid-cols-[1.2fr_1fr]">
-        <div class="max-w-[480px] space-y-5">
-            <p class="text-3xl font-medium leading-tight text-[#2b2f45]">
+    <section class="grid min-h-[78vh] items-center gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
+        <div class="max-w-[480px] space-y-4 sm:space-y-5">
+            <p class="text-xl font-medium leading-tight text-[#2b2f45] sm:text-3xl">
                 Здравствуйте{{ firstName || lastName ? `, ${firstName} ${lastName}` : '' }} 👋
             </p>
-            <p class="text-xl font-normal text-[#4b4f67]">Вы приглашены на собеседование на позицию</p>
-            <h1 class="mt-8 text-5xl font-bold leading-none text-[#1f2440]">{{ positionTitle }}</h1>
+            <p class="text-sm font-normal text-[#4b4f67] sm:text-xl">Вы приглашены на собеседование на позицию</p>
+            <h1 class="mt-4 text-2xl font-bold leading-tight text-[#1f2440] sm:mt-8 sm:text-4xl sm:leading-none lg:text-5xl">{{ positionTitle }}</h1>
 
-            <dl class="mt-8 grid grid-cols-[auto_1fr] gap-x-8 gap-y-3 text-sm text-[#5c6076]">
+            <dl class="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm text-[#5c6076] sm:mt-8 sm:gap-x-8 sm:gap-y-3">
                 <dt class="opacity-80 font-light">Язык</dt>
                 <dd class="text-[#2f334c] font-medium">Русский</dd>
 
@@ -46,15 +46,15 @@ const totalTimeLabel = computed(() => {
 
             <button
                 type="button"
-                class="btn-brand mt-6 inline-flex h-12 min-w-[260px] cursor-pointer items-center justify-center px-10 text-sm font-semibold text-white"
+                class="btn-brand mt-6 inline-flex h-12 w-full cursor-pointer items-center justify-center px-10 text-sm font-semibold text-white sm:w-auto sm:min-w-[260px]"
                 @click="$emit('start')"
             >
                 Начать
             </button>
         </div>
 
-        <div class="space-y-4 rounded-3xl border border-[#E6E6EF] bg-white p-8">
-            <h2 class="text-2xl font-bold leading-snug text-[#252a45]">Перед стартом</h2>
+        <div class="space-y-4 rounded-3xl border border-[#E6E6EF] bg-white p-5 sm:p-8">
+            <h2 class="text-xl font-bold leading-snug text-[#252a45] sm:text-2xl">Перед стартом</h2>
             <p class="text-sm text-[#636985]">Перед началом интервью убедитесь, что:</p>
 
             <div class="flex flex-col gap-3">

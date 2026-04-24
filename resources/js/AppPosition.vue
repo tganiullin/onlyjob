@@ -220,23 +220,23 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="grid min-h-screen lg:grid-cols-[minmax(280px,0.9fr)_minmax(640px,1fr)]">
-        <aside class="bg-[#eff3f8] px-10 py-10">
+        <aside class="bg-[#eff3f8] px-6 py-8 sm:px-10 sm:py-10">
             <div class="mx-auto w-full max-w-[480px]">
                 <img
                     v-if="logoUrl"
                     :src="logoUrl"
                     alt="Логотип компании"
-                    class="h-12 w-auto"
+                    class="h-10 w-auto sm:h-12"
                 >
-                <div v-else class="text-[34px] font-black tracking-[0.22em] text-[#1f2440]">AYA</div>
+                <div v-else class="text-[28px] font-black tracking-[0.22em] text-[#1f2440] sm:text-[34px]">AYA</div>
 
-                <div class="mt-28">
-                    <p class="text-3xl font-medium leading-tight text-[#2b2f45]">Здравствуйте 👋</p>
-                    <p class="text-xl font-normal text-[#4b4f67]">Вы приглашены на собеседование на позицию</p>
-                    <h1 class="mt-8 text-5xl font-bold leading-none text-[#1f2440]">{{ positionTitle }}</h1>
+                <div class="mt-10 sm:mt-16 lg:mt-28">
+                    <p class="text-xl font-medium leading-tight text-[#2b2f45] sm:text-3xl">Здравствуйте 👋</p>
+                    <p class="text-sm font-normal text-[#4b4f67] sm:text-xl">Вы приглашены на собеседование на позицию</p>
+                    <h1 class="mt-4 text-2xl font-bold leading-tight text-[#1f2440] sm:mt-8 sm:text-4xl sm:leading-none lg:text-5xl">{{ positionTitle }}</h1>
                 </div>
 
-                <dl class="mt-8 grid grid-cols-[auto_1fr] gap-x-8 gap-y-3 text-sm text-[#5c6076]">
+                <dl class="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm text-[#5c6076] sm:mt-8 sm:gap-x-8 sm:gap-y-3">
 <!--                    <dt class="opacity-80">Компания</dt>-->
 <!--                    <dd class="text-[#2f334c]">Тест</dd>-->
 
@@ -252,11 +252,11 @@ onBeforeUnmount(() => {
             </div>
         </aside>
 
-        <main class="px-6 py-10 sm:px-10 bg-white">
+        <main class="bg-white px-4 py-8 sm:px-10 sm:py-10">
             <div class="mx-auto flex min-h-full w-full max-w-[540px] items-center">
-                <section class="w-full space-y-6 rounded-3xl bg-white p-8 border border-[#E6E6EF]">
-                    <header class="mb-8 text-left">
-                        <h2 class="text-center text-2xl font-bold leading-snug text-[#252a45]">
+                <section class="w-full space-y-5 rounded-3xl border border-[#E6E6EF] bg-white p-5 sm:space-y-6 sm:p-8">
+                    <header class="mb-4 text-left sm:mb-8">
+                        <h2 class="text-center text-lg font-bold leading-snug text-[#252a45] sm:text-2xl">
                             Заполните форму, чтобы начать собеседование
                         </h2>
                     </header>
