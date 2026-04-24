@@ -546,7 +546,7 @@ onUnmounted(() => {
 
                 <div v-for="message in selectedCompanyQuestionMessages" :key="message.key" class="space-y-4">
                     <div class="flex items-start justify-end gap-3">
-                        <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tr-md bg-[var(--color-brand)] px-6 py-5 text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
+                        <div class="chat-bubble max-w-[620px] whitespace-pre-line rounded-2xl rounded-tr-md bg-[var(--color-brand)] px-6 py-5 text-white shadow-[0_10px_32px_rgba(93,103,166,0.22)]">
                             {{ message.question }}
                         </div>
                     </div>
@@ -558,7 +558,7 @@ onUnmounted(() => {
                         >
                             L
                         </div>
-                        <div class="chat-bubble max-w-[620px] rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
+                        <div class="chat-bubble max-w-[620px] whitespace-pre-line rounded-2xl rounded-tl-md bg-white px-6 py-5 text-[#2f344d] shadow-[0_10px_32px_rgba(93,103,166,0.12)]">
                             {{ message.answer }}
                         </div>
                     </div>
