@@ -35,6 +35,19 @@ class InterviewAdvancedFiltersTest extends TestCase
             ->assertTableFilterVisible('completed_at');
     }
 
+    public function test_interviews_are_sorted_by_created_at_desc_by_default(): void
+    {
+        $olderInterview = Interview::factory()->create([
+            'created_at' => now()->subDay(),
+        ]);
+        $newerInterview = Interview::factory()->create([
+            'created_at' => now(),
+        ]);
+
+        Livewire::test(ListInterviews::class)
+            ->assertCanSeeTableRecords([$newerInterview, $olderInterview], inOrder: true);
+    }
+
     public function test_quick_status_filter_still_works(): void
     {
         $pending = Interview::factory()->create([
